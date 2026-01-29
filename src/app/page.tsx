@@ -114,17 +114,6 @@ export default function Home() {
             </div>
           </div>
           
-          {/* Trusted by section */}
-          <div className="relative border-t border-zinc-200/50 bg-white/50 backdrop-blur-sm">
-            <div className="max-w-6xl mx-auto px-4 py-8">
-              <p className="text-center text-sm text-zinc-400 mb-6">Trusted by remote workers and digital nomads from</p>
-              <div className="flex flex-wrap justify-center items-center gap-8 opacity-60 grayscale">
-                {['Google', 'Meta', 'Amazon', 'Microsoft', 'Apple', 'Netflix'].map((company) => (
-                  <span key={company} className="text-zinc-400 font-semibold text-lg">{company}</span>
-                ))}
-              </div>
-            </div>
-          </div>
         </section>
         
         {/* Stats Bar */}
