@@ -6,65 +6,182 @@ export interface LocationData {
   currency: string;
   currencySymbol: string;
   
-  // Cost of Living (monthly, in local currency)
-  costs: {
+  // Housing (monthly, in local currency)
+  housing: {
     rentStudio: number;
     rent1BR: number;
     rent2BR: number;
     rent3BR: number;
     rent4BR: number;
-    utilities: number; // electricity, water, gas, internet
-    groceries: number; // per person
-    transportation: number; // public transit or car costs
-    healthcare: number; // insurance/out of pocket average
-    childcareInfant: number; // per child, full-time
-    childcareToddler: number; // per child, full-time
-    childcarePreschool: number; // per child, full-time
+    buyPricePerSqMeter: number; // to buy property
+    propertyTaxRate: number; // annual, as % of property value
+    homeInsuranceMonthly: number;
+  };
+  
+  // Utilities (monthly)
+  utilities: {
+    electricity: number;
+    water: number;
+    gas: number;
+    internet: number;
+    mobilePhone: number;
+    cableTV: number;
+    total: number;
+  };
+  
+  // Food & Groceries (monthly per person)
+  food: {
+    groceriesBasic: number; // basic food basket
+    groceriesMidRange: number; // mid-range shopping
+    restaurantCheapMeal: number; // single meal, cheap restaurant
+    restaurantMidRange: number; // 3-course meal, mid-range
+    restaurantHighEnd: number; // fine dining per person
+    coffee: number; // cappuccino
+    beer: number; // domestic, restaurant
+    fastFood: number; // combo meal
+  };
+  
+  // Transportation (monthly)
+  transportation: {
+    publicTransitPass: number;
+    taxiPerKm: number;
+    taxiStartFare: number;
+    gasPerLiter: number;
+    carInsuranceMonthly: number;
+    carPaymentAverage: number; // average car loan payment
+    parkingMonthly: number; // city center
+    rideSharePerKm: number; // Uber/Lyft equivalent
+  };
+  
+  // Healthcare (monthly)
+  healthcare: {
+    insurancePremium: number; // private health insurance
+    doctorVisit: number; // general practitioner
+    dentistVisit: number;
+    prescriptionAverage: number;
+    hospitalDayPrivate: number;
+  };
+  
+  // Childcare & Education (monthly)
+  childcare: {
+    daycareInfant: number; // 0-1 year, full-time
+    daycareToddler: number; // 1-3 years, full-time
+    preschool: number; // 3-5 years
+    privateSchoolPrimary: number; // per year
+    privateSchoolSecondary: number; // per year
+    collegeTuitionLocal: number; // per year, public university
+    collegeTuitionPrivate: number; // per year
+    babysitterHourly: number;
+    summerCampWeekly: number;
+  };
+  
+  // Personal Care & Fitness (monthly)
+  lifestyle: {
+    gymMembership: number;
+    movieTicket: number;
+    theaterTicket: number;
+    clothingBrand: number; // jeans, mid-range
+    shoes: number; // running shoes, mid-range
+    haircut: number;
+    cosmetics: number; // monthly average
   };
   
   // Taxes
   taxes: {
-    incomeTaxRate: number; // effective rate for median income
+    incomeTaxBrackets: { min: number; max: number; rate: number }[];
+    effectiveRateMedian: number; // for median income
+    effectiveRateHigh: number; // for high earners ($150k+)
+    capitalGainsTax: number;
     salesTaxRate: number;
-    propertyTaxRate: number; // annual, as % of property value
+    propertyTaxRate: number;
+    socialSecurityRate: number; // employee portion
   };
   
-  // Income
+  // Income (annual, in local currency)
   income: {
-    medianSalary: number; // annual, in local currency
+    minimumWageMonthly: number;
+    medianSalary: number;
     averageSalary: number;
-    minimumWage: number; // hourly
+    techSalaryAverage: number;
+    financeSalaryAverage: number;
+    healthcareSalaryAverage: number;
+    teacherSalaryAverage: number;
   };
   
-  // Quality of life indicators
+  // Quality of Life (indices 0-100)
   quality: {
-    safetyIndex: number; // 0-100
-    healthcareIndex: number; // 0-100
-    pollutionIndex: number; // 0-100 (lower is better)
+    safetyIndex: number;
+    healthcareIndex: number;
+    pollutionIndex: number; // lower is better
+    trafficIndex: number; // lower is better
+    climateIndex: number;
+    costOfLivingIndex: number; // relative to NYC (100)
+    qualityOfLifeIndex: number;
     climateDescription: string;
+    averageCommute: number; // minutes
   };
   
-  // Exchange rate to USD (for conversions)
+  // Exchange rate
   exchangeRateToUSD: number;
   
-  // Data freshness
+  // Metadata
   dataDate: string;
   sources: string[];
+}
+
+export interface ComparisonInput {
+  origin: string;
+  destination: string;
+  salary: number;
+  bedrooms: 'studio' | '1BR' | '2BR' | '3BR' | '4BR';
+  numAdults: number;
+  children: { age: number }[];
+  hasCar: boolean;
+  diningOutFrequency: 'rarely' | 'sometimes' | 'often'; // per week
+  lifestyleLevel: 'budget' | 'moderate' | 'comfortable' | 'luxury';
 }
 
 export interface ComparisonResult {
   origin: LocationData;
   destination: LocationData;
+  inputs: ComparisonInput;
   
-  // Calculated comparisons (all in USD for consistency)
-  comparison: {
-    costOfLivingDifference: number; // % difference
-    rentDifference: number; // % difference
-    purchasingPowerDifference: number; // % difference
-    monthlyNetDifference: number; // absolute USD difference in monthly surplus
-    annualNetDifference: number;
-    recommendedSalary: number; // to maintain same lifestyle in destination
+  // Detailed monthly breakdown (in USD)
+  breakdown: {
+    origin: MonthlyBreakdown;
+    destination: MonthlyBreakdown;
   };
+  
+  // Summary comparison
+  comparison: {
+    totalMonthlyCostOrigin: number;
+    totalMonthlyCostDestination: number;
+    costDifferencePercent: number;
+    monthlySurplusOrigin: number;
+    monthlySurplusDestination: number;
+    surplusDifferenceMonthly: number;
+    surplusDifferenceAnnual: number;
+    salaryNeededToMatchLifestyle: number; // in destination currency
+    purchasingPowerIndex: number; // 100 = same, >100 = better in dest
+  };
+  
+  // Recommendations
+  recommendations: string[];
+}
+
+export interface MonthlyBreakdown {
+  grossIncome: number;
+  taxes: number;
+  netIncome: number;
+  housing: number;
+  utilities: number;
+  food: number;
+  transportation: number;
+  healthcare: number;
+  childcare: number;
+  lifestyle: number;
+  totalExpenses: number;
+  surplus: number;
 }
 
 const PERPLEXITY_API_URL = 'https://api.perplexity.ai/chat/completions';
@@ -75,51 +192,126 @@ export async function researchLocation(location: string): Promise<LocationData> 
     throw new Error('PERPLEXITY_API_KEY not configured');
   }
 
-  const prompt = `Research the cost of living in "${location}". Provide accurate, up-to-date data in JSON format with these exact fields:
+  const prompt = `Research comprehensive cost of living data for "${location}". 
+
+Provide accurate, up-to-date data (2024-2025) in JSON format. All monetary values in LOCAL CURRENCY.
 
 {
   "location": "City, Country",
   "country": "Country name",
-  "currency": "Currency code (e.g., USD, EUR, GBP)",
-  "currencySymbol": "Symbol (e.g., $, €, £)",
-  "costs": {
-    "rentStudio": monthly rent for studio apartment in city center,
-    "rent1BR": monthly rent for 1-bedroom apartment in city center,
-    "rent2BR": monthly rent for 2-bedroom apartment in city center,
-    "rent3BR": monthly rent for 3-bedroom apartment in city center,
-    "rent4BR": monthly rent for 4-bedroom apartment/house,
-    "utilities": monthly utilities (electricity, water, gas, internet) for 85m2 apartment,
-    "groceries": monthly groceries for one person,
-    "transportation": monthly transportation (public transit pass or average car costs),
-    "healthcare": monthly healthcare costs (insurance or out of pocket average),
-    "childcareInfant": monthly full-time childcare for infant (0-1 year),
-    "childcareToddler": monthly full-time childcare for toddler (1-3 years),
-    "childcarePreschool": monthly full-time childcare for preschooler (3-5 years)
+  "currency": "ISO code (USD/EUR/GBP/etc)",
+  "currencySymbol": "$€£ etc",
+  
+  "housing": {
+    "rentStudio": monthly studio apartment rent (city center),
+    "rent1BR": monthly 1-bedroom rent (city center),
+    "rent2BR": monthly 2-bedroom rent (city center),
+    "rent3BR": monthly 3-bedroom rent (city center),
+    "rent4BR": monthly 4-bedroom house/apartment rent,
+    "buyPricePerSqMeter": price to buy property per square meter (city center),
+    "propertyTaxRate": annual property tax as decimal (e.g. 0.01 for 1%),
+    "homeInsuranceMonthly": average monthly home insurance
   },
+  
+  "utilities": {
+    "electricity": monthly electricity (85sqm apartment),
+    "water": monthly water,
+    "gas": monthly gas/heating,
+    "internet": monthly internet (60+ Mbps),
+    "mobilePhone": monthly mobile plan with data,
+    "cableTV": monthly cable/streaming,
+    "total": sum of all utilities
+  },
+  
+  "food": {
+    "groceriesBasic": monthly basic groceries (1 person),
+    "groceriesMidRange": monthly mid-range groceries (1 person),
+    "restaurantCheapMeal": cheap restaurant meal,
+    "restaurantMidRange": 3-course mid-range restaurant (1 person),
+    "restaurantHighEnd": fine dining per person,
+    "coffee": cappuccino at cafe,
+    "beer": domestic beer at restaurant,
+    "fastFood": fast food combo meal
+  },
+  
+  "transportation": {
+    "publicTransitPass": monthly public transit pass,
+    "taxiPerKm": taxi price per km,
+    "taxiStartFare": taxi start/flag fare,
+    "gasPerLiter": gasoline price per liter,
+    "carInsuranceMonthly": average car insurance monthly,
+    "carPaymentAverage": average monthly car loan payment,
+    "parkingMonthly": monthly parking (city center),
+    "rideSharePerKm": Uber/Lyft per km
+  },
+  
+  "healthcare": {
+    "insurancePremium": monthly private health insurance (individual),
+    "doctorVisit": general practitioner visit,
+    "dentistVisit": dental checkup,
+    "prescriptionAverage": average prescription cost,
+    "hospitalDayPrivate": private hospital per day
+  },
+  
+  "childcare": {
+    "daycareInfant": monthly full-time daycare (0-1 year),
+    "daycareToddler": monthly full-time daycare (1-3 years),
+    "preschool": monthly preschool (3-5 years),
+    "privateSchoolPrimary": annual private primary school tuition,
+    "privateSchoolSecondary": annual private secondary school tuition,
+    "collegeTuitionLocal": annual public university tuition (local students),
+    "collegeTuitionPrivate": annual private university tuition,
+    "babysitterHourly": babysitter hourly rate,
+    "summerCampWeekly": summer camp weekly cost
+  },
+  
+  "lifestyle": {
+    "gymMembership": monthly gym membership,
+    "movieTicket": cinema ticket,
+    "theaterTicket": theater/concert average ticket,
+    "clothingBrand": mid-range jeans,
+    "shoes": mid-range running shoes,
+    "haircut": average haircut,
+    "cosmetics": monthly cosmetics/toiletries average
+  },
+  
   "taxes": {
-    "incomeTaxRate": effective income tax rate as decimal (e.g., 0.25 for 25%) for someone earning median salary,
-    "salesTaxRate": sales/VAT tax rate as decimal,
-    "propertyTaxRate": annual property tax rate as decimal (% of property value)
+    "incomeTaxBrackets": [{"min": 0, "max": X, "rate": 0.X}, ...],
+    "effectiveRateMedian": effective tax rate at median income (decimal),
+    "effectiveRateHigh": effective tax rate at $150k equivalent (decimal),
+    "capitalGainsTax": capital gains tax rate (decimal),
+    "salesTaxRate": sales/VAT tax rate (decimal),
+    "propertyTaxRate": annual property tax rate (decimal),
+    "socialSecurityRate": employee social security/national insurance rate (decimal)
   },
+  
   "income": {
-    "medianSalary": median annual salary in local currency,
-    "averageSalary": average annual salary in local currency,
-    "minimumWage": minimum wage per hour in local currency
+    "minimumWageMonthly": monthly minimum wage (full-time),
+    "medianSalary": annual median salary,
+    "averageSalary": annual average salary,
+    "techSalaryAverage": annual average tech/software salary,
+    "financeSalaryAverage": annual average finance salary,
+    "healthcareSalaryAverage": annual average healthcare professional salary,
+    "teacherSalaryAverage": annual average teacher salary
   },
+  
   "quality": {
-    "safetyIndex": safety index 0-100 (100 is safest),
-    "healthcareIndex": healthcare quality index 0-100,
-    "pollutionIndex": pollution index 0-100 (0 is cleanest),
-    "climateDescription": brief climate description
+    "safetyIndex": 0-100 (100 safest),
+    "healthcareIndex": 0-100 (100 best),
+    "pollutionIndex": 0-100 (0 cleanest),
+    "trafficIndex": 0-100 (0 least traffic),
+    "climateIndex": 0-100 (100 most pleasant),
+    "costOfLivingIndex": relative to NYC=100,
+    "qualityOfLifeIndex": 0-100,
+    "climateDescription": "brief climate description",
+    "averageCommute": average commute minutes one-way
   },
-  "exchangeRateToUSD": current exchange rate (1 local currency = X USD),
-  "sources": ["list of data sources used"]
+  
+  "exchangeRateToUSD": 1 local currency = X USD,
+  "sources": ["data sources used"]
 }
 
-All monetary values should be in the LOCAL CURRENCY for that location.
-Use the most recent data available (2024-2025).
-If exact data isn't available, provide reasonable estimates based on similar cities.
-Return ONLY the JSON object, no additional text.`;
+Use data from Numbeo, Expatistan, government statistics, and local sources. If exact data unavailable, provide reasonable estimates. Return ONLY valid JSON.`;
 
   const response = await fetch(PERPLEXITY_API_URL, {
     method: 'POST',
@@ -128,19 +320,19 @@ Return ONLY the JSON object, no additional text.`;
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'sonar',
+      model: 'sonar-pro',
       messages: [
         {
           role: 'system',
-          content: 'You are a cost of living research assistant. Always respond with valid JSON only, no markdown or explanations. Use accurate, recent data from reliable sources like Numbeo, Expatistan, government statistics, and local real estate listings.'
+          content: 'You are a cost of living research expert. Always respond with valid JSON only. Use accurate, recent data. Be comprehensive and precise with numbers.'
         },
         {
           role: 'user',
           content: prompt
         }
       ],
-      temperature: 0.1, // Low temperature for more consistent/factual responses
-      max_tokens: 2000,
+      temperature: 0.1,
+      max_tokens: 4000,
     }),
   });
 
@@ -157,17 +349,13 @@ Return ONLY the JSON object, no additional text.`;
     throw new Error('No response from Perplexity');
   }
 
-  // Parse the JSON response
   try {
-    // Clean up the response in case it has markdown code blocks
     const cleanedContent = content
       .replace(/```json\n?/g, '')
       .replace(/```\n?/g, '')
       .trim();
     
     const locationData = JSON.parse(cleanedContent);
-    
-    // Add data date
     locationData.dataDate = new Date().toISOString().split('T')[0];
     
     return locationData as LocationData;
@@ -180,92 +368,212 @@ Return ONLY the JSON object, no additional text.`;
 export function calculateComparison(
   origin: LocationData,
   destination: LocationData,
-  salary: number, // in origin currency
-  bedrooms: '1BR' | '2BR' | '3BR' | '4BR' = '1BR',
-  numAdults: number = 1,
-  children: { age: number }[] = []
+  input: ComparisonInput
 ): ComparisonResult {
-  // Convert everything to USD for comparison
+  const { salary, bedrooms, numAdults, children, hasCar, diningOutFrequency, lifestyleLevel } = input;
+  
   const originToUSD = origin.exchangeRateToUSD;
   const destToUSD = destination.exchangeRateToUSD;
   
-  // Get rent based on bedroom selection
+  // Lifestyle multipliers
+  const lifestyleMultiplier = {
+    budget: 0.7,
+    moderate: 1.0,
+    comfortable: 1.3,
+    luxury: 1.8,
+  }[lifestyleLevel];
+  
+  const diningMultiplier = {
+    rarely: 2, // 2 meals out per month
+    sometimes: 8, // 2 per week
+    often: 16, // 4 per week
+  }[diningOutFrequency];
+  
+  // Helper functions
   const getRent = (data: LocationData) => {
-    switch (bedrooms) {
-      case '1BR': return data.costs.rent1BR;
-      case '2BR': return data.costs.rent2BR;
-      case '3BR': return data.costs.rent3BR;
-      case '4BR': return data.costs.rent4BR;
-      default: return data.costs.rent1BR;
-    }
+    const rents = {
+      studio: data.housing.rentStudio,
+      '1BR': data.housing.rent1BR,
+      '2BR': data.housing.rent2BR,
+      '3BR': data.housing.rent3BR,
+      '4BR': data.housing.rent4BR,
+    };
+    return rents[bedrooms];
   };
   
-  // Calculate childcare costs
   const getChildcareCost = (data: LocationData) => {
     return children.reduce((total, child) => {
-      if (child.age < 1) return total + data.costs.childcareInfant;
-      if (child.age < 3) return total + data.costs.childcareToddler;
-      if (child.age < 5) return total + data.costs.childcarePreschool;
-      return total; // School age, no childcare cost
+      if (child.age < 1) return total + data.childcare.daycareInfant;
+      if (child.age < 3) return total + data.childcare.daycareToddler;
+      if (child.age < 6) return total + data.childcare.preschool;
+      return total;
     }, 0);
   };
   
-  // Calculate monthly costs in local currencies
-  const originMonthlyCosts = 
-    getRent(origin) +
-    origin.costs.utilities +
-    (origin.costs.groceries * numAdults) +
-    origin.costs.transportation +
-    origin.costs.healthcare +
-    getChildcareCost(origin);
+  const getFoodCost = (data: LocationData) => {
+    const groceries = lifestyleLevel === 'budget' 
+      ? data.food.groceriesBasic 
+      : data.food.groceriesMidRange;
+    const diningOut = diningMultiplier * (
+      lifestyleLevel === 'luxury' 
+        ? data.food.restaurantHighEnd 
+        : lifestyleLevel === 'budget'
+          ? data.food.restaurantCheapMeal
+          : data.food.restaurantMidRange
+    );
+    return (groceries * numAdults) + diningOut;
+  };
   
-  const destMonthlyCosts = 
-    getRent(destination) +
-    destination.costs.utilities +
-    (destination.costs.groceries * numAdults) +
-    destination.costs.transportation +
-    destination.costs.healthcare +
-    getChildcareCost(destination);
+  const getTransportCost = (data: LocationData) => {
+    if (hasCar) {
+      return data.transportation.carInsuranceMonthly + 
+             data.transportation.carPaymentAverage + 
+             data.transportation.parkingMonthly +
+             (data.transportation.gasPerLiter * 60); // ~60L/month average
+    }
+    return data.transportation.publicTransitPass * numAdults;
+  };
   
-  // Convert to USD
-  const originCostsUSD = originMonthlyCosts * originToUSD;
-  const destCostsUSD = destMonthlyCosts * destToUSD;
+  const getLifestyleCost = (data: LocationData) => {
+    return (
+      data.lifestyle.gymMembership +
+      (data.lifestyle.movieTicket * 2) +
+      data.lifestyle.haircut +
+      data.lifestyle.cosmetics
+    ) * lifestyleMultiplier;
+  };
   
-  // Calculate net income
-  const originMonthlyGross = salary / 12;
-  const originMonthlyNet = originMonthlyGross * (1 - origin.taxes.incomeTaxRate);
-  const originMonthlySurplus = originMonthlyNet - originMonthlyCosts;
-  const originSurplusUSD = originMonthlySurplus * originToUSD;
+  // Calculate tax
+  const calculateTax = (data: LocationData, annualIncome: number) => {
+    let tax = 0;
+    let remaining = annualIncome;
+    
+    for (const bracket of data.taxes.incomeTaxBrackets) {
+      if (remaining <= 0) break;
+      const taxableInBracket = Math.min(remaining, bracket.max - bracket.min);
+      tax += taxableInBracket * bracket.rate;
+      remaining -= taxableInBracket;
+    }
+    
+    // Add social security
+    tax += annualIncome * data.taxes.socialSecurityRate;
+    
+    return tax;
+  };
   
-  // For destination, assume same USD-equivalent salary initially
+  // Calculate monthly breakdown for origin
+  const originAnnualTax = calculateTax(origin, salary);
+  const originMonthlyNet = (salary - originAnnualTax) / 12;
+  
+  const originBreakdown: MonthlyBreakdown = {
+    grossIncome: salary / 12,
+    taxes: originAnnualTax / 12,
+    netIncome: originMonthlyNet,
+    housing: getRent(origin),
+    utilities: origin.utilities.total,
+    food: getFoodCost(origin),
+    transportation: getTransportCost(origin),
+    healthcare: origin.healthcare.insurancePremium,
+    childcare: getChildcareCost(origin),
+    lifestyle: getLifestyleCost(origin),
+    totalExpenses: 0,
+    surplus: 0,
+  };
+  originBreakdown.totalExpenses = 
+    originBreakdown.housing +
+    originBreakdown.utilities +
+    originBreakdown.food +
+    originBreakdown.transportation +
+    originBreakdown.healthcare +
+    originBreakdown.childcare +
+    originBreakdown.lifestyle;
+  originBreakdown.surplus = originBreakdown.netIncome - originBreakdown.totalExpenses;
+  
+  // For destination, convert salary to local currency (same USD value)
   const salaryUSD = salary * originToUSD;
   const destSalaryLocal = salaryUSD / destToUSD;
-  const destMonthlyGross = destSalaryLocal / 12;
-  const destMonthlyNet = destMonthlyGross * (1 - destination.taxes.incomeTaxRate);
-  const destMonthlySurplus = destMonthlyNet - destMonthlyCosts;
-  const destSurplusUSD = destMonthlySurplus * destToUSD;
+  const destAnnualTax = calculateTax(destination, destSalaryLocal);
+  const destMonthlyNet = (destSalaryLocal - destAnnualTax) / 12;
   
-  // Calculate differences
-  const costOfLivingDifference = ((destCostsUSD - originCostsUSD) / originCostsUSD) * 100;
-  const rentDifference = ((getRent(destination) * destToUSD - getRent(origin) * originToUSD) / (getRent(origin) * originToUSD)) * 100;
-  const monthlyNetDifference = destSurplusUSD - originSurplusUSD;
+  const destBreakdown: MonthlyBreakdown = {
+    grossIncome: destSalaryLocal / 12,
+    taxes: destAnnualTax / 12,
+    netIncome: destMonthlyNet,
+    housing: getRent(destination),
+    utilities: destination.utilities.total,
+    food: getFoodCost(destination),
+    transportation: getTransportCost(destination),
+    healthcare: destination.healthcare.insurancePremium,
+    childcare: getChildcareCost(destination),
+    lifestyle: getLifestyleCost(destination),
+    totalExpenses: 0,
+    surplus: 0,
+  };
+  destBreakdown.totalExpenses = 
+    destBreakdown.housing +
+    destBreakdown.utilities +
+    destBreakdown.food +
+    destBreakdown.transportation +
+    destBreakdown.healthcare +
+    destBreakdown.childcare +
+    destBreakdown.lifestyle;
+  destBreakdown.surplus = destBreakdown.netIncome - destBreakdown.totalExpenses;
   
-  // Calculate salary needed in destination to maintain same surplus
+  // Convert breakdowns to USD for comparison
+  const originExpensesUSD = originBreakdown.totalExpenses * originToUSD;
+  const destExpensesUSD = destBreakdown.totalExpenses * destToUSD;
+  const originSurplusUSD = originBreakdown.surplus * originToUSD;
+  const destSurplusUSD = destBreakdown.surplus * destToUSD;
+  
+  // Calculate salary needed in destination to match origin surplus
   const targetSurplusLocal = originSurplusUSD / destToUSD;
-  const neededMonthlyNet = targetSurplusLocal + destMonthlyCosts;
-  const neededMonthlyGross = neededMonthlyNet / (1 - destination.taxes.incomeTaxRate);
-  const recommendedSalary = neededMonthlyGross * 12;
+  const neededMonthlyNet = targetSurplusLocal + destBreakdown.totalExpenses;
+  const neededAnnualNet = neededMonthlyNet * 12;
+  // Rough inverse of tax calculation
+  const effectiveTaxRate = destAnnualTax / destSalaryLocal;
+  const salaryNeededToMatch = neededAnnualNet / (1 - effectiveTaxRate);
+  
+  // Generate recommendations
+  const recommendations: string[] = [];
+  
+  const costDiff = ((destExpensesUSD - originExpensesUSD) / originExpensesUSD) * 100;
+  if (costDiff < -20) {
+    recommendations.push(`${destination.location} is significantly cheaper (${Math.abs(Math.round(costDiff))}% lower cost of living)`);
+  } else if (costDiff > 20) {
+    recommendations.push(`${destination.location} is significantly more expensive (${Math.round(costDiff)}% higher cost of living)`);
+  }
+  
+  if (destSurplusUSD > originSurplusUSD * 1.2) {
+    recommendations.push(`You'd have ${Math.round(((destSurplusUSD / originSurplusUSD) - 1) * 100)}% more surplus in ${destination.location}`);
+  }
+  
+  if (destination.quality.safetyIndex > origin.quality.safetyIndex + 10) {
+    recommendations.push(`${destination.location} has a notably higher safety index`);
+  }
+  
+  if (children.length > 0 && getChildcareCost(destination) * destToUSD < getChildcareCost(origin) * originToUSD * 0.7) {
+    recommendations.push(`Childcare is significantly cheaper in ${destination.location}`);
+  }
   
   return {
     origin,
     destination,
-    comparison: {
-      costOfLivingDifference: Math.round(costOfLivingDifference * 10) / 10,
-      rentDifference: Math.round(rentDifference * 10) / 10,
-      purchasingPowerDifference: Math.round(-costOfLivingDifference * 10) / 10, // Inverse of cost difference
-      monthlyNetDifference: Math.round(monthlyNetDifference),
-      annualNetDifference: Math.round(monthlyNetDifference * 12),
-      recommendedSalary: Math.round(recommendedSalary),
+    inputs: input,
+    breakdown: {
+      origin: originBreakdown,
+      destination: destBreakdown,
     },
+    comparison: {
+      totalMonthlyCostOrigin: Math.round(originExpensesUSD),
+      totalMonthlyCostDestination: Math.round(destExpensesUSD),
+      costDifferencePercent: Math.round(costDiff * 10) / 10,
+      monthlySurplusOrigin: Math.round(originSurplusUSD),
+      monthlySurplusDestination: Math.round(destSurplusUSD),
+      surplusDifferenceMonthly: Math.round(destSurplusUSD - originSurplusUSD),
+      surplusDifferenceAnnual: Math.round((destSurplusUSD - originSurplusUSD) * 12),
+      salaryNeededToMatchLifestyle: Math.round(salaryNeededToMatch),
+      purchasingPowerIndex: Math.round((originExpensesUSD / destExpensesUSD) * 100),
+    },
+    recommendations,
   };
 }
