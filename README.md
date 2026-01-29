@@ -1,36 +1,113 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Realocation 📍
+
+**"Where would your money go further?"**
+
+An AI-powered relocation calculator that helps people discover cities where their salary would give them a better lifestyle.
+
+## The Product
+
+### Free (Viral Hook)
+- Input: Salary + current city
+- Output: Ranked list of cities where you'd have more money monthly
+- Goal: Create "holy shit" moment → drive to paid
+
+### Paid ($39 one-time)
+- Full dynamic calculator
+- Adjust salary, housing, family size in real-time
+- Compare up to 5 cities side-by-side
+- Detailed breakdown (taxes, rent, childcare, etc.)
+- PDF export
+- Save & share
+
+## Tech Stack
+
+- **Frontend:** Next.js 14 (App Router)
+- **Styling:** Tailwind CSS
+- **Database:** Supabase (auth + saved reports)
+- **Payments:** Stripe Checkout
+- **AI/Data:** Perplexity API (for research), custom calculations
+- **Deployment:** Vercel
+
+## Project Structure
+
+```
+realocation/
+├── app/
+│   ├── page.tsx              # Landing + free calculator
+│   ├── results/
+│   │   └── page.tsx          # Free results (ranked cities)
+│   ├── calculator/
+│   │   └── page.tsx          # Paid dynamic calculator
+│   ├── api/
+│   │   ├── calculate/
+│   │   │   └── route.ts      # Free calculation endpoint
+│   │   ├── full-calculate/
+│   │   │   └── route.ts      # Paid full calculation
+│   │   └── checkout/
+│   │       └── route.ts      # Stripe checkout session
+│   └── layout.tsx
+├── components/
+│   ├── Calculator.tsx        # Main calculator component
+│   ├── CityCard.tsx          # City result card
+│   ├── ComparisonTable.tsx   # Side-by-side comparison
+│   ├── SalarySlider.tsx      # Dynamic salary input
+│   └── PricingCard.tsx       # Upgrade CTA
+├── lib/
+│   ├── calculations.ts       # Tax & cost of living math
+│   ├── cities-data.ts        # City database
+│   ├── supabase.ts           # Supabase client
+│   └── stripe.ts             # Stripe helpers
+├── data/
+│   └── cities.json           # City cost data
+├── docs/
+│   ├── PRD.md                # Product Requirements
+│   ├── BUSINESS_MODEL.md     # Business model details
+│   └── DATA_SOURCES.md       # Where data comes from
+└── public/
+    └── og-image.png          # Social share image
+```
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env.local
+# Add your keys:
+# - NEXT_PUBLIC_SUPABASE_URL
+# - NEXT_PUBLIC_SUPABASE_ANON_KEY
+# - STRIPE_SECRET_KEY
+# - STRIPE_WEBHOOK_SECRET
+
+# Run development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment Variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Stripe
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 
-## Learn More
+# Optional: Perplexity for AI research
+PERPLEXITY_API_KEY=pplx_...
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Deployment
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Push to GitHub
+2. Connect to Vercel
+3. Add environment variables
+4. Deploy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## License
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT

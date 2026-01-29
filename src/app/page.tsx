@@ -1,65 +1,116 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import SalaryInput from '@/components/SalaryInput';
+import CitySelect from '@/components/CitySelect';
 
 export default function Home() {
+  const router = useRouter();
+  const [salary, setSalary] = useState(150000);
+  const [cityId, setCityId] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!salary || !cityId) {
+      return;
+    }
+    
+    setIsLoading(true);
+    router.push(`/results?salary=${salary}&city=${cityId}`);
+  };
+  
+  const isValid = salary > 0 && cityId !== '';
+  
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main className="min-h-screen flex flex-col">
+      {/* Hero Section */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-16 bg-gradient-to-b from-blue-50 to-white">
+        <div className="w-full max-w-md">
+          {/* Logo/Title */}
+          <div className="text-center mb-10">
+            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+              Where would your money go{' '}
+              <span className="text-blue-600">further</span>?
+            </h1>
+            <p className="text-lg text-gray-600">
+              Find out in 10 seconds.
+            </p>
+          </div>
+          
+          {/* Calculator Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label htmlFor="salary" className="block text-sm font-medium text-gray-700 mb-2">
+                Your annual salary
+              </label>
+              <SalaryInput value={salary} onChange={setSalary} />
+            </div>
+            
+            <div>
+              <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2">
+                Your current city
+              </label>
+              <CitySelect value={cityId} onChange={setCityId} />
+            </div>
+            
+            <button
+              type="submit"
+              disabled={!isValid || isLoading}
+              className="w-full py-4 px-6 text-lg font-semibold text-white bg-blue-600 
+                         rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 
+                         focus:ring-blue-500 focus:ring-offset-2 transition-all
+                         disabled:opacity-50 disabled:cursor-not-allowed
+                         shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Calculating...
+                </span>
+              ) : (
+                'Show Me Where →'
+              )}
+            </button>
+          </form>
+          
+          {/* Trust Signals */}
+          <div className="mt-10 pt-8 border-t border-gray-200">
+            <div className="flex items-center justify-center gap-8 text-sm text-gray-500">
+              <div className="flex items-center gap-1">
+                <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>50 US cities</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>2024 tax rates</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Free</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </div>
+      
+      {/* Footer */}
+      <footer className="py-6 px-4 border-t border-gray-200 bg-white">
+        <div className="max-w-md mx-auto text-center text-sm text-gray-500">
+          <p>© {new Date().getFullYear()} Realocation. All rights reserved.</p>
         </div>
-      </main>
-    </div>
+      </footer>
+    </main>
   );
 }
