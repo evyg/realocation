@@ -9,7 +9,7 @@ const stats = [
 
 export default function Stats() {
   return (
-    <section className="py-12 bg-blue-600">
+    <section className="py-12 bg-teal-600">
       <div className="max-w-6xl mx-auto px-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {stats.map((stat, index) => (
@@ -17,7 +17,7 @@ export default function Stats() {
               <div className="text-3xl sm:text-4xl font-bold text-white mb-1">
                 {stat.value}
               </div>
-              <div className="text-blue-200 text-sm">
+              <div className="text-teal-200 text-sm">
                 {stat.label}
               </div>
             </div>

@@ -38,7 +38,7 @@ export default function HowItWorks() {
     <section id="how-it-works" className="py-16 sm:py-20 bg-white scroll-mt-20">
       <div className="max-w-6xl mx-auto px-4">
         <div className="text-center mb-12">
-          <span className="inline-block px-4 py-1 bg-blue-100 text-blue-700 text-sm font-medium rounded-full mb-4">
+          <span className="inline-block px-4 py-1 bg-teal-100 text-teal-700 text-sm font-medium rounded-full mb-4">
             Simple & Fast
           </span>
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
@@ -58,11 +58,11 @@ export default function HowItWorks() {
               )}
               
               {/* Step circle */}
-              <div className="relative inline-flex items-center justify-center w-24 h-24 bg-blue-50 rounded-full mb-6">
-                <div className="absolute -top-2 -right-2 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+              <div className="relative inline-flex items-center justify-center w-24 h-24 bg-teal-50 rounded-full mb-6">
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-teal-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
                   {step.number}
                 </div>
-                <div className="text-blue-600">
+                <div className="text-teal-600">
                   {step.icon}
                 </div>
               </div>
