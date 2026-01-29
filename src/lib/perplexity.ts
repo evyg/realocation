@@ -272,7 +272,7 @@ function validateLocationData(data: LocationData): LocationData {
   return validated;
 }
 
-export async function researchLocation(location: string): Promise<LocationData> {
+async function callPerplexity(location: string, retryCount = 0): Promise<LocationData> {
   const apiKey = process.env.PERPLEXITY_API_KEY;
   if (!apiKey) {
     throw new Error('PERPLEXITY_API_KEY not configured');
@@ -436,10 +436,17 @@ Use data from Numbeo, Expatistan, government statistics, and local sources. If e
   }
 
   try {
-    const cleanedContent = content
+    // Clean up the response - remove markdown code blocks and any extra text
+    let cleanedContent = content
       .replace(/```json\n?/g, '')
       .replace(/```\n?/g, '')
       .trim();
+    
+    // Try to extract JSON if there's extra text around it
+    const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      cleanedContent = jsonMatch[0];
+    }
     
     const locationData = JSON.parse(cleanedContent);
     locationData.dataDate = new Date().toISOString().split('T')[0];
@@ -449,9 +456,19 @@ Use data from Numbeo, Expatistan, government statistics, and local sources. If e
     
     return validated as LocationData;
   } catch (parseError) {
-    console.error('Failed to parse Perplexity response:', content);
-    throw new Error('Failed to parse location data');
+    console.error('Failed to parse Perplexity response. Content preview:', content?.substring(0, 500));
+    console.error('Parse error:', parseError);
+    // Retry once if this is the first attempt
+    if (retryCount < 1) {
+      console.log(`Retrying research for ${location} (attempt ${retryCount + 2})`);
+      return callPerplexity(location, retryCount + 1);
+    }
+    throw new Error(`Failed to parse location data. The AI response was malformed. Please try again.`);
   }
+}
+
+export async function researchLocation(location: string): Promise<LocationData> {
+  return callPerplexity(location, 0);
 }
 
 export function calculateComparison(
