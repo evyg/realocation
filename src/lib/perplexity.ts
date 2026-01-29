@@ -204,6 +204,35 @@ const US_DEFAULTS = {
     prescriptionAverage: 30,
     hospitalDayPrivate: 2500,
   },
+  food: {
+    groceriesBasic: 350,
+    groceriesMidRange: 500,
+    restaurantCheapMeal: 18,
+    restaurantMidRange: 65,
+    restaurantHighEnd: 150,
+    coffee: 5,
+    beer: 8,
+    fastFood: 12,
+  },
+  transportation: {
+    publicTransitPass: 130,
+    taxiPerKm: 2.5,
+    taxiStartFare: 3.5,
+    gasPerLiter: 1.0,
+    carInsuranceMonthly: 150,
+    carPaymentAverage: 500,
+    parkingMonthly: 200,
+    rideSharePerKm: 2.0,
+  },
+  lifestyle: {
+    gymMembership: 60,
+    movieTicket: 16,
+    theaterTicket: 100,
+    clothingBrand: 50,
+    shoes: 90,
+    haircut: 30,
+    cosmetics: 40,
+  },
 };
 
 function validateLocationData(data: LocationData): LocationData {
@@ -215,10 +244,8 @@ function validateLocationData(data: LocationData): LocationData {
                validated.country?.toLowerCase() === 'usa' ||
                validated.currency === 'USD';
   
-  const defaults = isUS ? US_DEFAULTS : {
-    utilities: { ...US_DEFAULTS.utilities },
-    healthcare: { ...US_DEFAULTS.healthcare },
-  };
+  // Use US_DEFAULTS as base for all locations (reasonable fallbacks)
+  const defaults = US_DEFAULTS;
   
   // Validate utilities - if total is 0 or very low, use defaults
   if (!validated.utilities || validated.utilities.total < 50) {
@@ -243,6 +270,37 @@ function validateLocationData(data: LocationData): LocationData {
   // Validate healthcare
   if (!validated.healthcare || validated.healthcare.insurancePremium === 0) {
     validated.healthcare = { ...validated.healthcare, ...defaults.healthcare };
+  }
+  
+  // Validate food
+  if (!validated.food || validated.food.groceriesBasic === 0) {
+    validated.food = { ...defaults.food, ...validated.food };
+    // Ensure no zeros in critical fields
+    for (const key of Object.keys(defaults.food) as (keyof typeof defaults.food)[]) {
+      if (!validated.food[key] || validated.food[key] === 0) {
+        validated.food[key] = defaults.food[key];
+      }
+    }
+  }
+  
+  // Validate transportation  
+  if (!validated.transportation || validated.transportation.publicTransitPass === 0) {
+    validated.transportation = { ...defaults.transportation, ...validated.transportation };
+    for (const key of Object.keys(defaults.transportation) as (keyof typeof defaults.transportation)[]) {
+      if (!validated.transportation[key] || validated.transportation[key] === 0) {
+        validated.transportation[key] = defaults.transportation[key];
+      }
+    }
+  }
+  
+  // Validate lifestyle
+  if (!validated.lifestyle || validated.lifestyle.gymMembership === 0) {
+    validated.lifestyle = { ...defaults.lifestyle, ...validated.lifestyle };
+    for (const key of Object.keys(defaults.lifestyle) as (keyof typeof defaults.lifestyle)[]) {
+      if (!validated.lifestyle[key] || validated.lifestyle[key] === 0) {
+        validated.lifestyle[key] = defaults.lifestyle[key];
+      }
+    }
   }
   
   // Validate exchange rate (should never be 0)
