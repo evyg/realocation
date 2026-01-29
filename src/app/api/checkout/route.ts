@@ -1,24 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// This will use Stripe when STRIPE_SECRET_KEY is configured
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { priceId } = body;
     
-    // Check if Stripe is configured
     const stripeKey = process.env.STRIPE_SECRET_KEY;
     
-    if (!stripeKey || stripeKey.startsWith('sk_test_your')) {
+    if (!stripeKey) {
       return NextResponse.json({
         error: 'Payment system not configured',
-        message: 'Stripe integration pending. Please check back soon!',
-        debug: { hasKey: !!stripeKey, keyPrefix: stripeKey?.substring(0, 12) }
       }, { status: 503 });
     }
     
-    // Dynamic import to avoid build errors when Stripe isn't installed
     const Stripe = (await import('stripe')).default;
     const stripe = new Stripe(stripeKey);
     
@@ -46,18 +40,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url: session.url });
   } catch (error) {
     console.error('Checkout error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const stripeKey = process.env.STRIPE_SECRET_KEY;
     return NextResponse.json(
-      { 
-        error: 'Failed to create checkout session', 
-        details: errorMessage,
-        debug: {
-          keyLength: stripeKey?.length,
-          keyPrefix: stripeKey?.substring(0, 12),
-          priceId: process.env.STRIPE_PRICE_ID,
-        }
-      },
+      { error: 'Failed to create checkout session' },
       { status: 500 }
     );
   }
