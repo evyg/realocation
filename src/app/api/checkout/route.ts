@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // This will use Stripe when STRIPE_SECRET_KEY is configured
-// For now, returns a placeholder response
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,16 +11,18 @@ export async function POST(request: NextRequest) {
     const stripeKey = process.env.STRIPE_SECRET_KEY;
     
     if (!stripeKey || stripeKey.startsWith('sk_test_your')) {
-      // Stripe not configured - return placeholder
       return NextResponse.json({
         error: 'Payment system not configured',
         message: 'Stripe integration pending. Please check back soon!',
+        debug: { hasKey: !!stripeKey, keyPrefix: stripeKey?.substring(0, 12) }
       }, { status: 503 });
     }
     
     // Dynamic import to avoid build errors when Stripe isn't installed
     const Stripe = (await import('stripe')).default;
-    const stripe = new Stripe(stripeKey);
+    const stripe = new Stripe(stripeKey, {
+      apiVersion: '2024-12-18.acacia',
+    });
     
     // Get the price ID from environment or use a default
     const actualPriceId = priceId === 'pro_lifetime' 
@@ -48,8 +49,17 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Checkout error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
     return NextResponse.json(
-      { error: 'Failed to create checkout session', details: errorMessage },
+      { 
+        error: 'Failed to create checkout session', 
+        details: errorMessage,
+        debug: {
+          keyLength: stripeKey?.length,
+          keyPrefix: stripeKey?.substring(0, 12),
+          priceId: process.env.STRIPE_PRICE_ID,
+        }
+      },
       { status: 500 }
     );
   }
