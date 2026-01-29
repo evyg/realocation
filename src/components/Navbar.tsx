@@ -9,6 +9,7 @@ export default function Navbar() {
   const pathname = usePathname();
   
   const navLinks = [
+    { href: '/calculator', label: 'Calculator' },
     { href: '/#how-it-works', label: 'How It Works' },
     { href: '/pricing', label: 'Pricing' },
     { href: '/blog', label: 'Blog' },
@@ -67,7 +68,7 @@ export default function Navbar() {
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
             <Link
-              href="/"
+              href="/calculator"
               className="px-5 py-2.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white text-sm font-semibold rounded-xl
                          hover:from-teal-600 hover:to-teal-700 transition-all shadow-lg shadow-teal-500/20"
             >
@@ -113,7 +114,7 @@ export default function Navbar() {
               </Link>
             ))}
             <Link
-              href="/"
+              href="/calculator"
               onClick={() => setIsMenuOpen(false)}
               className="block w-full py-3 mt-4 bg-gradient-to-r from-teal-500 to-teal-600 text-white text-center font-semibold rounded-xl"
             >
