@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
     // Log for analytics (non-blocking)
     const supabase = getSupabase();
     if (supabase) {
-      supabase.from('calculations').insert({
+      void supabase.from('calculations').insert({
         salary,
         current_city: origin,
         top_cities: { 
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
           inputs: input,
           summary: comparison.comparison,
         },
-      }).catch(() => {});
+      });
     }
 
     return NextResponse.json({

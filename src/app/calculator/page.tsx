@@ -14,6 +14,7 @@ interface LocationData {
   country: string;
   currency: string;
   currencySymbol: string;
+  exchangeRateToUSD: number;
   housing: {
     rent1BR: number;
     rent2BR: number;
