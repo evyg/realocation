@@ -19,7 +19,7 @@ export default function CitySelect({ value, onChange }: CitySelectProps) {
       onChange={(e) => onChange(e.target.value)}
       className="w-full px-4 py-4 text-lg font-medium border border-gray-300 rounded-xl 
                  bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                 transition-all appearance-none cursor-pointer"
+                 transition-all appearance-none cursor-pointer touch-manipulation"
       style={{
         backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
         backgroundPosition: 'right 1rem center',

@@ -1,15 +1,18 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useMemo } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
 import CityCard from '@/components/CityCard';
+import EmailResultsModal from '@/components/EmailResultsModal';
 import { compareCities, formatCurrency, getCityById } from '@/lib/calculations';
 
 function ResultsContent() {
   const searchParams = useSearchParams();
   const salary = parseInt(searchParams.get('salary') || '0', 10);
   const cityId = searchParams.get('city') || '';
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
   
   const results = useMemo(() => {
     if (!salary || !cityId) return null;
@@ -36,7 +39,9 @@ function ResultsContent() {
           </p>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-4 bg-blue-600 text-white 
+                       font-medium rounded-xl hover:bg-blue-700 transition-colors
+                       touch-manipulation active:bg-blue-800"
           >
             ← Start Over
           </Link>
@@ -48,47 +53,147 @@ function ResultsContent() {
   const betterCities = results.rankedCities.filter(r => r.differenceFromCurrent > 0);
   const FREE_LIMIT = 5;
   
+  // Prepare data for email
+  const emailResults = betterCities.map(r => ({
+    name: r.city.name,
+    state: r.city.state,
+    monthlySurplus: r.monthlySurplus,
+    difference: r.differenceFromCurrent,
+  }));
+  
+  const handleShare = async () => {
+    const shareUrl = window.location.href;
+    const shareText = `I could have $${Math.round(betterCities[0]?.differenceFromCurrent || 0).toLocaleString()} more per month by moving from ${currentCity.name} to ${betterCities[0]?.city.name}! Check your own: `;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'My Realocation Results',
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch {
+        // User cancelled or share failed
+      }
+    } else {
+      // Fallback: copy link
+      await navigator.clipboard.writeText(shareUrl);
+      setShareStatus('copied');
+      setTimeout(() => setShareStatus('idle'), 2000);
+    }
+  };
+  
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-blue-600">
+      {/* Header - sticky, mobile-optimized */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10 safe-area-inset">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Link href="/" className="text-xl font-bold text-blue-600 py-2 touch-manipulation">
             Realocation
           </Link>
           <Link
             href="/"
-            className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+            className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1 
+                       py-2 px-3 -mr-3 touch-manipulation active:bg-gray-100 rounded-lg"
           >
             ← New search
           </Link>
         </div>
       </header>
       
-      {/* Results */}
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      {/* Floating Action Bar - Mobile-first */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-20 
+                      safe-area-inset-bottom sm:relative sm:border-0 sm:bg-transparent sm:p-0">
+        <div className="max-w-2xl mx-auto flex gap-3 sm:hidden">
+          <button
+            onClick={() => setShowEmailModal(true)}
+            className="flex-1 py-4 px-4 bg-blue-600 text-white font-semibold rounded-xl
+                       flex items-center justify-center gap-2 touch-manipulation active:bg-blue-700"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            Save Results
+          </button>
+          <button
+            onClick={handleShare}
+            className="py-4 px-5 bg-gray-100 text-gray-700 font-semibold rounded-xl
+                       flex items-center justify-center gap-2 touch-manipulation active:bg-gray-200"
+          >
+            {shareStatus === 'copied' ? (
+              <>
+                <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </>
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+            )}
+          </button>
+        </div>
+      </div>
+      
+      {/* Results - with bottom padding for floating bar on mobile */}
+      <div className="max-w-2xl mx-auto px-4 py-6 pb-28 sm:pb-8">
         {/* Summary */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-medium mb-4">
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-medium mb-3">
             🎯 {betterCities.length} cities where you&apos;d have MORE
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Results for {formatCurrency(salary)} salary
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
+            Results for {formatCurrency(salary)}
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 text-sm sm:text-base">
             Currently in {currentCity.name}, {currentCity.state}
           </p>
         </div>
         
+        {/* Desktop action buttons */}
+        <div className="hidden sm:flex gap-3 mb-6 justify-center">
+          <button
+            onClick={() => setShowEmailModal(true)}
+            className="py-3 px-5 bg-blue-600 text-white font-medium rounded-xl
+                       flex items-center gap-2 hover:bg-blue-700 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            Email Results
+          </button>
+          <button
+            onClick={handleShare}
+            className="py-3 px-5 bg-gray-100 text-gray-700 font-medium rounded-xl
+                       flex items-center gap-2 hover:bg-gray-200 transition-colors"
+          >
+            {shareStatus === 'copied' ? (
+              <>
+                <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Copied!
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                Share
+              </>
+            )}
+          </button>
+        </div>
+        
         {/* Current City Card */}
         <div className="mb-6">
-          <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
             Your Current Situation
           </h2>
-          <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
+          <div className="bg-blue-50 rounded-xl p-4 sm:p-5 border border-blue-200">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">
                   {currentCity.name}, {currentCity.state}
                 </h3>
                 <p className="text-sm text-gray-600 mt-1">
@@ -96,15 +201,15 @@ function ResultsContent() {
                 </p>
               </div>
               <div className="text-right">
-                <div className="text-lg font-bold text-gray-900">
+                <div className="text-base sm:text-lg font-bold text-gray-900">
                   {formatCurrency(results.currentCity.monthlySurplus)}/mo
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-xs sm:text-sm text-gray-600">
                   Monthly surplus
                 </div>
               </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-blue-200 grid grid-cols-3 gap-4 text-sm">
+            <div className="mt-4 pt-4 border-t border-blue-200 grid grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm">
               <div>
                 <span className="text-gray-500 block">Net Income</span>
                 <span className="font-medium text-gray-900">{formatCurrency(results.currentCity.netIncome)}/yr</span>
@@ -122,11 +227,11 @@ function ResultsContent() {
         </div>
         
         {/* Better Cities */}
-        <div className="mb-8">
-          <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
+        <div className="mb-6">
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
             Better Options ({betterCities.length} cities)
           </h2>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {betterCities.slice(0, FREE_LIMIT).map((result, index) => (
               <CityCard
                 key={result.city.id}
@@ -153,14 +258,14 @@ function ResultsContent() {
         
         {/* Upgrade CTA */}
         {betterCities.length > FREE_LIMIT && (
-          <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-6 text-white text-center shadow-lg">
-            <h3 className="text-xl font-bold mb-2">
+          <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-5 sm:p-6 text-white text-center shadow-lg">
+            <h3 className="text-lg sm:text-xl font-bold mb-2">
               💡 Want the full picture?
             </h3>
-            <p className="text-blue-100 mb-4">
+            <p className="text-blue-100 mb-4 text-sm sm:text-base">
               You&apos;re only seeing {FREE_LIMIT} of {betterCities.length} cities where you&apos;d be better off.
             </p>
-            <ul className="text-left text-sm mb-6 space-y-2 max-w-xs mx-auto">
+            <ul className="text-left text-sm mb-5 space-y-2 max-w-xs mx-auto">
               <li className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -179,16 +284,11 @@ function ResultsContent() {
                 </svg>
                 <span>Adjust for housing, family size</span>
               </li>
-              <li className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span>Dynamic sliders to explore options</span>
-              </li>
             </ul>
             <button
               className="w-full py-4 px-6 bg-white text-blue-600 font-semibold rounded-xl 
-                         hover:bg-blue-50 transition-colors shadow-lg"
+                         hover:bg-blue-50 active:bg-blue-100 transition-colors shadow-lg
+                         touch-manipulation"
               onClick={() => alert('Stripe checkout coming soon! For now, enjoy the free tier.')}
             >
               Unlock Full Calculator — $39
@@ -200,7 +300,7 @@ function ResultsContent() {
         )}
         
         {/* Footer */}
-        <div className="mt-12 pt-8 border-t border-gray-200 text-center text-sm text-gray-500">
+        <div className="mt-10 pt-6 border-t border-gray-200 text-center text-xs sm:text-sm text-gray-500">
           <p>
             Calculations based on 2024 federal and state tax rates.
           </p>
@@ -209,6 +309,19 @@ function ResultsContent() {
           </p>
         </div>
       </div>
+      
+      {/* Email Modal */}
+      <EmailResultsModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        salary={salary}
+        currentCity={{
+          name: currentCity.name,
+          state: currentCity.state,
+          monthlySurplus: results.currentCity.monthlySurplus,
+        }}
+        results={emailResults}
+      />
     </main>
   );
 }

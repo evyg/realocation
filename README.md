@@ -1,113 +1,128 @@
-# Realocation 📍
+# Realocation
 
-**"Where would your money go further?"**
+**Where would your money go further?**
 
-An AI-powered relocation calculator that helps people discover cities where their salary would give them a better lifestyle.
+A cost of living calculator that compares your real take-home pay across 50+ US cities. Factor in federal taxes, state taxes, and rent to make smarter relocation decisions.
 
-## The Product
+🔗 **Live:** [realocation.app](https://realocation.app)
 
-### Free (Viral Hook)
-- Input: Salary + current city
-- Output: Ranked list of cities where you'd have more money monthly
-- Goal: Create "holy shit" moment → drive to paid
+## Features
 
-### Paid ($39 one-time)
-- Full dynamic calculator
-- Adjust salary, housing, family size in real-time
-- Compare up to 5 cities side-by-side
-- Detailed breakdown (taxes, rent, childcare, etc.)
-- PDF export
-- Save & share
+- ✅ **Real Tax Calculations** - Federal + state income tax using actual 2024 brackets
+- ✅ **50+ US Cities** - Compare major metros and emerging destinations  
+- ✅ **Monthly Surplus** - See exactly what you'll have after taxes and rent
+- ✅ **Instant Results** - No sign-up required, results in 10 seconds
+- ✅ **Mobile-First** - Optimized for any device
+- ✅ **Email Results** - Save your results for later review
+- ✅ **Pro Upgrade** - Full rankings, side-by-side comparisons, housing adjustments
 
 ## Tech Stack
 
-- **Frontend:** Next.js 14 (App Router)
-- **Styling:** Tailwind CSS
-- **Database:** Supabase (auth + saved reports)
-- **Payments:** Stripe Checkout
-- **AI/Data:** Perplexity API (for research), custom calculations
-- **Deployment:** Vercel
+- **Framework:** Next.js 16 (App Router)
+- **Styling:** Tailwind CSS 4
+- **Database:** Supabase (PostgreSQL)
+- **Payments:** Stripe
+- **Email:** Resend
+- **Hosting:** Vercel (recommended)
+
+## Getting Started
+
+### 1. Clone & Install
+
+```bash
+git clone https://github.com/yourusername/realocation.git
+cd realocation
+npm install
+```
+
+### 2. Configure Environment
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` with your keys (see Setup Checklist below).
+
+### 3. Run Locally
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Setup Checklist
+
+### 1. Supabase (Database)
+
+1. Create a new project at [supabase.com](https://supabase.com)
+2. Go to Settings > API and copy:
+   - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
+   - Anon public key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - Service role key → `SUPABASE_SERVICE_ROLE_KEY`
+3. Run the migration in SQL Editor:
+   ```
+   supabase/migrations/001_initial_schema.sql
+   ```
+
+### 2. Stripe (Payments)
+
+1. Create account at [stripe.com](https://stripe.com)
+2. Go to Developers > API keys and copy:
+   - Publishable key → `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+   - Secret key → `STRIPE_SECRET_KEY`
+3. Create a Product:
+   - Name: "Realocation Pro"
+   - Price: $39 (one-time)
+   - Copy the price ID → `STRIPE_PRICE_ID`
+4. Set up Webhook:
+   - Endpoint: `https://yoursite.com/api/webhook`
+   - Events: `checkout.session.completed`, `payment_intent.payment_failed`
+   - Copy webhook secret → `STRIPE_WEBHOOK_SECRET`
+
+### 3. Resend (Email)
+
+1. Create account at [resend.com](https://resend.com)
+2. Add and verify your domain (e.g., `realocation.app`)
+3. Create an API key → `RESEND_API_KEY`
+
+### 4. Deploy to Vercel
+
+```bash
+npx vercel
+```
+
+Or connect your GitHub repo at [vercel.com/new](https://vercel.com/new).
+
+**Important:** Add all environment variables in the Vercel dashboard.
 
 ## Project Structure
 
 ```
 realocation/
-├── app/
-│   ├── page.tsx              # Landing + free calculator
-│   ├── results/
-│   │   └── page.tsx          # Free results (ranked cities)
-│   ├── calculator/
-│   │   └── page.tsx          # Paid dynamic calculator
-│   ├── api/
-│   │   ├── calculate/
-│   │   │   └── route.ts      # Free calculation endpoint
-│   │   ├── full-calculate/
-│   │   │   └── route.ts      # Paid full calculation
-│   │   └── checkout/
-│   │       └── route.ts      # Stripe checkout session
-│   └── layout.tsx
-├── components/
-│   ├── Calculator.tsx        # Main calculator component
-│   ├── CityCard.tsx          # City result card
-│   ├── ComparisonTable.tsx   # Side-by-side comparison
-│   ├── SalarySlider.tsx      # Dynamic salary input
-│   └── PricingCard.tsx       # Upgrade CTA
-├── lib/
-│   ├── calculations.ts       # Tax & cost of living math
-│   ├── cities-data.ts        # City database
-│   ├── supabase.ts           # Supabase client
-│   └── stripe.ts             # Stripe helpers
-├── data/
-│   └── cities.json           # City cost data
-├── docs/
-│   ├── PRD.md                # Product Requirements
-│   ├── BUSINESS_MODEL.md     # Business model details
-│   └── DATA_SOURCES.md       # Where data comes from
-└── public/
-    └── og-image.png          # Social share image
+├── src/
+│   ├── app/                  # Next.js App Router pages
+│   │   ├── api/              # API routes (checkout, webhook, subscribe)
+│   │   ├── blog/             # Blog pages
+│   │   ├── pricing/          # Pricing page
+│   │   ├── results/          # Calculator results
+│   │   └── ...
+│   ├── components/           # React components
+│   └── lib/                  # Utilities (calculations, etc.)
+├── public/                   # Static assets
+├── supabase/                 # Database migrations
+└── content/                  # Blog/social content
 ```
 
-## Getting Started
+## Revenue Model
 
-```bash
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env.local
-# Add your keys:
-# - NEXT_PUBLIC_SUPABASE_URL
-# - NEXT_PUBLIC_SUPABASE_ANON_KEY
-# - STRIPE_SECRET_KEY
-# - STRIPE_WEBHOOK_SECRET
-
-# Run development server
-npm run dev
-```
-
-## Environment Variables
-
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-
-# Stripe
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
-
-# Optional: Perplexity for AI research
-PERPLEXITY_API_KEY=pplx_...
-```
-
-## Deployment
-
-1. Push to GitHub
-2. Connect to Vercel
-3. Add environment variables
-4. Deploy
+- **Free Tier:** Top 5 cities, basic results
+- **Pro ($39 one-time):** All 50+ cities, comparisons, housing adjustments, PDF export
 
 ## License
 
 MIT
+
+---
+
+Built with ☕ and data.

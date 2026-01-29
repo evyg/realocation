@@ -7,11 +7,21 @@ export interface City {
   stateTaxRate: number;
   localTaxRate: number;
   salesTaxRate: number;
+  medianRentStudio?: number;
   medianRent1BR: number;
   medianRent2BR: number;
   medianRent3BR: number;
   medianRent4BR: number;
   costIndex: number;
+}
+
+export type BedroomType = 'studio' | '1br' | '2br' | '3br' | '4br';
+
+export interface HouseholdOptions {
+  bedrooms?: BedroomType;
+  adults?: number;
+  children?: number;
+  hasCar?: boolean;
 }
 
 export interface CityResult {
@@ -24,6 +34,8 @@ export interface CityResult {
   netIncome: number;
   monthlyRent: number;
   monthlyCostOfLiving: number;
+  monthlyCostOfLivingBase: number;
+  monthlyCarCost: number;
   monthlySurplus: number;
   annualSurplus: number;
   differenceFromCurrent: number;
@@ -52,6 +64,7 @@ const STANDARD_DEDUCTION = 14600;
 
 // Base cost of living (monthly, national average)
 const BASE_MONTHLY_COL = 2500; // groceries, transport, utilities, etc. (excluding rent)
+const CAR_MONTHLY_COST = 450;
 
 export function calculateFederalTax(income: number): number {
   // Apply standard deduction
@@ -101,8 +114,10 @@ export function calculateFICA(income: number): number {
   return Math.round(socialSecurityTax + medicareTax);
 }
 
-export function getRent(city: City, bedrooms: '1br' | '2br' | '3br' | '4br' = '1br'): number {
+export function getRent(city: City, bedrooms: BedroomType = '1br'): number {
   switch (bedrooms) {
+    case 'studio':
+      return Math.round(city.medianRentStudio ?? city.medianRent1BR * 0.8);
     case '1br': return city.medianRent1BR;
     case '2br': return city.medianRent2BR;
     case '3br': return city.medianRent3BR;
@@ -111,16 +126,42 @@ export function getRent(city: City, bedrooms: '1br' | '2br' | '3br' | '4br' = '1
   }
 }
 
-export function calculateMonthlyCostOfLiving(city: City): number {
-  // Adjust base COL by city's cost index
-  return Math.round(BASE_MONTHLY_COL * (city.costIndex / 100));
+export function calculateMonthlyCostOfLiving(
+  city: City,
+  options: HouseholdOptions = {}
+): number {
+  const { adults = 1, children = 0, hasCar = false } = options;
+  const safeAdults = Math.max(1, Math.floor(adults));
+  const safeChildren = Math.max(0, Math.floor(children));
+  const familyMultiplier = 1 + Math.max(safeAdults - 1, 0) * 0.65 + safeChildren * 0.4;
+  const baseCost = BASE_MONTHLY_COL * (city.costIndex / 100);
+  const carCost = hasCar ? CAR_MONTHLY_COST : 0;
+  return Math.round(baseCost * familyMultiplier + carCost);
+}
+
+export function calculateMonthlyCostOfLivingDetails(
+  city: City,
+  options: HouseholdOptions = {}
+): { baseCost: number; carCost: number; total: number } {
+  const { adults = 1, children = 0, hasCar = false } = options;
+  const safeAdults = Math.max(1, Math.floor(adults));
+  const safeChildren = Math.max(0, Math.floor(children));
+  const familyMultiplier = 1 + Math.max(safeAdults - 1, 0) * 0.65 + safeChildren * 0.4;
+  const baseCost = Math.round(BASE_MONTHLY_COL * (city.costIndex / 100) * familyMultiplier);
+  const carCost = hasCar ? CAR_MONTHLY_COST : 0;
+  return {
+    baseCost,
+    carCost,
+    total: Math.round(baseCost + carCost),
+  };
 }
 
 export function calculateCityResult(
   salary: number,
   city: City,
-  bedrooms: '1br' | '2br' | '3br' | '4br' = '1br'
+  options: HouseholdOptions = {}
 ): CityResult {
+  const { bedrooms = '1br', adults = 1, children = 0, hasCar = false } = options;
   const grossIncome = salary;
   const federalTax = calculateFederalTax(salary);
   const stateTax = calculateStateTax(salary, city.stateTaxRate);
@@ -131,7 +172,8 @@ export function calculateCityResult(
   const netIncome = grossIncome - totalTax;
   
   const monthlyRent = getRent(city, bedrooms);
-  const monthlyCostOfLiving = calculateMonthlyCostOfLiving(city);
+  const colDetails = calculateMonthlyCostOfLivingDetails(city, { adults, children, hasCar });
+  const monthlyCostOfLiving = colDetails.total;
   const monthlyExpenses = monthlyRent + monthlyCostOfLiving;
   
   const monthlyNetIncome = netIncome / 12;
@@ -148,6 +190,8 @@ export function calculateCityResult(
     netIncome,
     monthlyRent,
     monthlyCostOfLiving,
+    monthlyCostOfLivingBase: colDetails.baseCost,
+    monthlyCarCost: colDetails.carCost,
     monthlySurplus: Math.round(monthlySurplus),
     annualSurplus: Math.round(annualSurplus),
     differenceFromCurrent: 0, // Will be calculated by comparison
@@ -157,7 +201,7 @@ export function calculateCityResult(
 export function compareCities(
   salary: number,
   currentCityId: string,
-  bedrooms: '1br' | '2br' | '3br' | '4br' = '1br'
+  options: HouseholdOptions = {}
 ): { currentCity: CityResult; rankedCities: CityResult[] } {
   const cities = citiesData as City[];
   const currentCity = cities.find(c => c.id === currentCityId);
@@ -166,10 +210,10 @@ export function compareCities(
     throw new Error(`City not found: ${currentCityId}`);
   }
   
-  const currentResult = calculateCityResult(salary, currentCity, bedrooms);
+  const currentResult = calculateCityResult(salary, currentCity, options);
   
   const allResults = cities.map(city => {
-    const result = calculateCityResult(salary, city, bedrooms);
+    const result = calculateCityResult(salary, city, options);
     return {
       ...result,
       differenceFromCurrent: result.monthlySurplus - currentResult.monthlySurplus,

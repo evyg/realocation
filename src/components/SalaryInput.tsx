@@ -59,7 +59,7 @@ export default function SalaryInput({ value, onChange }: SalaryInputProps) {
         placeholder="150,000"
         className="w-full pl-8 pr-4 py-4 text-lg font-medium border border-gray-300 rounded-xl 
                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                   transition-all placeholder:text-gray-400"
+                   transition-all placeholder:text-gray-400 touch-manipulation"
       />
     </div>
   );
