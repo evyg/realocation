@@ -16,10 +16,14 @@ export async function POST(request: NextRequest) {
     const Stripe = (await import('stripe')).default;
     const stripe = new Stripe(stripeKey);
     
-    // Get the price ID from environment or use a default
+    // Get the price ID from environment
     const actualPriceId = priceId === 'pro_lifetime' 
-      ? process.env.STRIPE_PRICE_ID || 'price_placeholder'
+      ? process.env.STRIPE_PRICE_ID
       : priceId;
+    
+    if (!actualPriceId) {
+      return NextResponse.json({ error: 'Price not configured' }, { status: 503 });
+    }
     
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',

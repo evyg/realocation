@@ -9,13 +9,8 @@ export async function GET(request: NextRequest) {
   
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   
-  if (!stripeKey || stripeKey.startsWith('sk_test_your')) {
-    // Stripe not configured - return success anyway for testing
-    return NextResponse.json({
-      verified: true,
-      email: null,
-      message: 'Stripe not configured - auto-verified',
-    });
+  if (!stripeKey) {
+    return NextResponse.json({ error: 'Payment system not configured' }, { status: 503 });
   }
   
   try {
