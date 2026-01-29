@@ -1,4 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SECRET_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
 
 // Stripe webhook handler
 // Processes payment events and updates user access
@@ -36,16 +45,32 @@ export async function POST(request: NextRequest) {
         const session = event.data.object;
         
         // Get customer email
-        const customerEmail = session.customer_details?.email;
+        const customerEmail = session.customer_details?.email || session.customer_email;
         
         if (customerEmail) {
-          // TODO: When Supabase is configured, update user's pro status here
-          // await supabase.from('purchases').insert({
-          //   email: customerEmail,
-          //   product: session.metadata?.product,
-          //   stripe_payment_id: session.payment_intent,
-          //   amount: session.amount_total,
-          // });
+          const supabase = getSupabase();
+          
+          if (supabase) {
+            // Record the purchase
+            await supabase.from('purchases').insert({
+              email: customerEmail,
+              product: session.metadata?.product || 'realocation_pro',
+              stripe_payment_id: typeof session.payment_intent === 'string' ? session.payment_intent : null,
+              stripe_session_id: session.id,
+              amount: session.amount_total,
+              status: 'completed',
+            });
+            
+            // Create or update user as pro
+            await supabase.from('users').upsert({
+              email: customerEmail,
+              is_pro: true,
+              pro_purchased_at: new Date().toISOString(),
+              stripe_customer_id: typeof session.customer === 'string' ? session.customer : null,
+            }, {
+              onConflict: 'email',
+            });
+          }
           
           console.log(`Pro purchase completed for: ${customerEmail}`);
         }

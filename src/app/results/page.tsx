@@ -1,11 +1,12 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import CityCard from '@/components/CityCard';
 import EmailResultsModal from '@/components/EmailResultsModal';
 import { compareCities, formatCurrency, getCityById } from '@/lib/calculations';
+import { createCheckoutSession, isPro } from '@/lib/checkout';
 
 function ResultsContent() {
   const searchParams = useSearchParams();
@@ -13,6 +14,25 @@ function ResultsContent() {
   const cityId = searchParams.get('city') || '';
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
+  const [isProUser, setIsProUser] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  
+  // Check pro status on mount
+  useEffect(() => {
+    setIsProUser(isPro());
+  }, []);
+  
+  // Handle checkout
+  const handleCheckout = async () => {
+    setIsCheckingOut(true);
+    const checkoutUrl = await createCheckoutSession();
+    if (checkoutUrl) {
+      window.location.href = checkoutUrl;
+    } else {
+      alert('Unable to start checkout. Please try again.');
+      setIsCheckingOut(false);
+    }
+  };
   
   const results = useMemo(() => {
     if (!salary || !cityId) return null;
@@ -51,7 +71,7 @@ function ResultsContent() {
   }
   
   const betterCities = results.rankedCities.filter(r => r.differenceFromCurrent > 0);
-  const FREE_LIMIT = 5;
+  const FREE_LIMIT = isProUser ? 999 : 5; // Pro users see all cities
   
   // Prepare data for email
   const emailResults = betterCities.map(r => ({
@@ -288,10 +308,21 @@ function ResultsContent() {
             <button
               className="w-full py-4 px-6 bg-white text-blue-600 font-semibold rounded-xl 
                          hover:bg-blue-50 active:bg-blue-100 transition-colors shadow-lg
-                         touch-manipulation"
-              onClick={() => alert('Stripe checkout coming soon! For now, enjoy the free tier.')}
+                         touch-manipulation disabled:opacity-50"
+              onClick={handleCheckout}
+              disabled={isCheckingOut}
             >
-              Unlock Full Calculator — $39
+              {isCheckingOut ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Processing...
+                </span>
+              ) : (
+                'Unlock Full Calculator — $39'
+              )}
             </button>
             <p className="text-xs text-blue-200 mt-3">
               One-time payment. Use forever.
