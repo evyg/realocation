@@ -4,9 +4,11 @@ export interface City {
   id: string;
   name: string;
   state: string;
+  stateCode?: string;
+  population?: number;
   stateTaxRate: number;
   localTaxRate: number;
-  salesTaxRate: number;
+  salesTaxRate?: number;
   medianRentStudio?: number;
   medianRent1BR: number;
   medianRent2BR: number;

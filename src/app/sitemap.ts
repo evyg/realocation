@@ -1,9 +1,18 @@
 import { MetadataRoute } from 'next';
+import citiesData from '@/data/cities-full.json';
+import citiesByState from '@/data/cities-by-state.json';
 
 type ChangeFrequency = 'daily' | 'weekly' | 'monthly' | 'always' | 'hourly' | 'yearly' | 'never';
 
+interface City {
+  id: string;
+  population: number;
+}
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://realocation.app';
+  const cities = citiesData as City[];
+  const states = Object.keys(citiesByState);
   
   // Static pages
   const staticPages: Array<{ path: string; freq: ChangeFrequency; priority: number }> = [
@@ -37,5 +46,28 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.6,
   }));
   
-  return [...staticEntries, ...blogEntries];
+  // State pages
+  const stateEntries: MetadataRoute.Sitemap = states.map((code) => ({
+    url: `${baseUrl}/state/${code.toLowerCase()}`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly' as ChangeFrequency,
+    priority: 0.7,
+  }));
+  
+  // City pages - prioritize by population
+  const cityEntries: MetadataRoute.Sitemap = cities.map((city) => {
+    let priority = 0.4;
+    if (city.population > 500000) priority = 0.7;
+    else if (city.population > 100000) priority = 0.6;
+    else if (city.population > 50000) priority = 0.5;
+    
+    return {
+      url: `${baseUrl}/city/${city.id}`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly' as ChangeFrequency,
+      priority,
+    };
+  });
+  
+  return [...staticEntries, ...blogEntries, ...stateEntries, ...cityEntries];
 }
