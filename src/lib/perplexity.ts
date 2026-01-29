@@ -496,8 +496,10 @@ Use data from Numbeo, Expatistan, government statistics, and local sources. If e
   try {
     // Clean up the response - remove markdown code blocks and any extra text
     let cleanedContent = content
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
+      .replace(/```json\n?/gi, '')
+      .replace(/```\n?/gi, '')
+      .replace(/^[^{]*/, '') // Remove any text before the first {
+      .replace(/[^}]*$/, '') // Remove any text after the last }
       .trim();
     
     // Try to extract JSON if there's extra text around it
@@ -505,6 +507,15 @@ Use data from Numbeo, Expatistan, government statistics, and local sources. If e
     if (jsonMatch) {
       cleanedContent = jsonMatch[0];
     }
+    
+    // Fix common JSON issues
+    cleanedContent = cleanedContent
+      .replace(/,\s*}/g, '}') // Remove trailing commas before }
+      .replace(/,\s*]/g, ']') // Remove trailing commas before ]
+      .replace(/:\s*,/g, ': null,') // Replace empty values with null
+      .replace(/:\s*}/g, ': null}')
+      .replace(/Infinity/g, '999999999') // Replace Infinity with large number
+      .replace(/NaN/g, '0'); // Replace NaN with 0
     
     const locationData = JSON.parse(cleanedContent);
     locationData.dataDate = new Date().toISOString().split('T')[0];
@@ -514,14 +525,16 @@ Use data from Numbeo, Expatistan, government statistics, and local sources. If e
     
     return validated as LocationData;
   } catch (parseError) {
-    console.error('Failed to parse Perplexity response. Content preview:', content?.substring(0, 500));
+    console.error('Failed to parse Perplexity response. Content preview:', content?.substring(0, 1000));
     console.error('Parse error:', parseError);
-    // Retry once if this is the first attempt
-    if (retryCount < 1) {
+    // Retry up to 2 times
+    if (retryCount < 2) {
       console.log(`Retrying research for ${location} (attempt ${retryCount + 2})`);
+      // Wait a bit before retrying
+      await new Promise(resolve => setTimeout(resolve, 1000));
       return callPerplexity(location, retryCount + 1);
     }
-    throw new Error(`Failed to parse location data. The AI response was malformed. Please try again.`);
+    throw new Error(`Failed to research "${location}". Please check the city name and try again, or try a different city.`);
   }
 }
 
