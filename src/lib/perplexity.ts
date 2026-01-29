@@ -186,6 +186,92 @@ export interface MonthlyBreakdown {
 
 const PERPLEXITY_API_URL = 'https://api.perplexity.ai/chat/completions';
 
+// Default values for US cities (in USD) to use when data is missing/zero
+const US_DEFAULTS = {
+  utilities: {
+    electricity: 120,
+    water: 50,
+    gas: 60,
+    internet: 70,
+    mobilePhone: 60,
+    cableTV: 50,
+    total: 410,
+  },
+  healthcare: {
+    insurancePremium: 450,
+    doctorVisit: 150,
+    dentistVisit: 100,
+    prescriptionAverage: 30,
+    hospitalDayPrivate: 2500,
+  },
+};
+
+function validateLocationData(data: LocationData): LocationData {
+  // Deep clone to avoid mutation
+  const validated = JSON.parse(JSON.stringify(data));
+  
+  // Check if this is a US location
+  const isUS = validated.country?.toLowerCase().includes('united states') || 
+               validated.country?.toLowerCase() === 'usa' ||
+               validated.currency === 'USD';
+  
+  const defaults = isUS ? US_DEFAULTS : {
+    utilities: { ...US_DEFAULTS.utilities },
+    healthcare: { ...US_DEFAULTS.healthcare },
+  };
+  
+  // Validate utilities - if total is 0 or very low, use defaults
+  if (!validated.utilities || validated.utilities.total < 50) {
+    validated.utilities = { ...defaults.utilities };
+  } else {
+    // Validate individual utility values
+    for (const key of Object.keys(defaults.utilities) as (keyof typeof defaults.utilities)[]) {
+      if (!validated.utilities[key] || validated.utilities[key] === 0) {
+        validated.utilities[key] = defaults.utilities[key];
+      }
+    }
+    // Recalculate total
+    validated.utilities.total = 
+      validated.utilities.electricity +
+      validated.utilities.water +
+      validated.utilities.gas +
+      validated.utilities.internet +
+      validated.utilities.mobilePhone +
+      validated.utilities.cableTV;
+  }
+  
+  // Validate healthcare
+  if (!validated.healthcare || validated.healthcare.insurancePremium === 0) {
+    validated.healthcare = { ...validated.healthcare, ...defaults.healthcare };
+  }
+  
+  // Validate exchange rate (should never be 0)
+  if (!validated.exchangeRateToUSD || validated.exchangeRateToUSD === 0) {
+    validated.exchangeRateToUSD = 1; // Assume USD if unknown
+  }
+  
+  // Validate tax brackets
+  if (!validated.taxes?.incomeTaxBrackets?.length) {
+    validated.taxes = validated.taxes || {};
+    validated.taxes.incomeTaxBrackets = [
+      { min: 0, max: 11600, rate: 0.10 },
+      { min: 11600, max: 47150, rate: 0.12 },
+      { min: 47150, max: 100525, rate: 0.22 },
+      { min: 100525, max: 191950, rate: 0.24 },
+      { min: 191950, max: 243725, rate: 0.32 },
+      { min: 243725, max: 609350, rate: 0.35 },
+      { min: 609350, max: Infinity, rate: 0.37 },
+    ];
+  }
+  
+  // Validate social security rate
+  if (!validated.taxes?.socialSecurityRate) {
+    validated.taxes.socialSecurityRate = 0.0765; // US FICA rate
+  }
+  
+  return validated;
+}
+
 export async function researchLocation(location: string): Promise<LocationData> {
   const apiKey = process.env.PERPLEXITY_API_KEY;
   if (!apiKey) {
@@ -358,7 +444,10 @@ Use data from Numbeo, Expatistan, government statistics, and local sources. If e
     const locationData = JSON.parse(cleanedContent);
     locationData.dataDate = new Date().toISOString().split('T')[0];
     
-    return locationData as LocationData;
+    // Validate and apply sensible defaults for missing/zero data
+    const validated = validateLocationData(locationData);
+    
+    return validated as LocationData;
   } catch (parseError) {
     console.error('Failed to parse Perplexity response:', content);
     throw new Error('Failed to parse location data');
