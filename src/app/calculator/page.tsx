@@ -251,7 +251,8 @@ export default function CalculatorPage() {
                         type="number"
                         value={salary}
                         onChange={(e) => setSalary(e.target.value ? Number(e.target.value) : '')}
-                        className="input-modern pl-10"
+                        className="input-modern"
+                        style={{ paddingLeft: '2.5rem' }}
                         placeholder="100,000"
                         min={0}
                         step={1000}
