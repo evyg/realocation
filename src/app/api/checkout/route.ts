@@ -20,9 +20,7 @@ export async function POST(request: NextRequest) {
     
     // Dynamic import to avoid build errors when Stripe isn't installed
     const Stripe = (await import('stripe')).default;
-    const stripe = new Stripe(stripeKey, {
-      apiVersion: '2024-12-18.acacia',
-    });
+    const stripe = new Stripe(stripeKey);
     
     // Get the price ID from environment or use a default
     const actualPriceId = priceId === 'pro_lifetime' 
