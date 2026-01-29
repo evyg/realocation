@@ -20,12 +20,31 @@ export default function Navbar() {
   };
   
   return (
-    <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
+    <nav className="glass border-b border-zinc-200/50 sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 touch-manipulation">
-            <img src="/logo.svg" alt="Realocation" className="h-8 w-auto" />
+            <div className="flex items-center gap-2">
+              {/* Icon */}
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 2C9.925 2 5 6.925 5 13C5 21.5 16 30 16 30C16 30 27 21.5 27 13C27 6.925 22.075 2 16 2Z" fill="url(#nav-gradient)"/>
+                <circle cx="16" cy="13" r="5" fill="white"/>
+                <path d="M14 15L16 11L18 15" stroke="#0F766E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M16 11V16" stroke="#0F766E" strokeWidth="2" strokeLinecap="round"/>
+                <defs>
+                  <linearGradient id="nav-gradient" x1="5" y1="2" x2="27" y2="30" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#14B8A6"/>
+                    <stop offset="1" stopColor="#0F766E"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+              {/* Wordmark */}
+              <span className="text-xl font-bold tracking-tight">
+                <span className="text-zinc-900">real</span>
+                <span className="text-teal-600">ocation</span>
+              </span>
+            </div>
           </Link>
           
           {/* Desktop Nav */}
@@ -36,8 +55,8 @@ export default function Navbar() {
                 href={link.href}
                 className={`text-sm font-medium transition-colors ${
                   isActive(link.href)
-                    ? 'text-blue-600'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'text-teal-600'
+                    : 'text-zinc-600 hover:text-zinc-900'
                 }`}
               >
                 {link.label}
@@ -49,8 +68,8 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-4">
             <Link
               href="/"
-              className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg
-                         hover:bg-blue-700 transition-colors shadow-sm"
+              className="px-5 py-2.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white text-sm font-semibold rounded-xl
+                         hover:from-teal-600 hover:to-teal-700 transition-all shadow-lg shadow-teal-500/20"
             >
               Try Free Calculator
             </Link>
@@ -59,7 +78,7 @@ export default function Navbar() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden p-2 -mr-2 text-gray-600 touch-manipulation"
+            className="md:hidden p-2 -mr-2 text-zinc-600 touch-manipulation"
             aria-label="Toggle menu"
           >
             {isMenuOpen ? (
@@ -77,7 +96,7 @@ export default function Navbar() {
       
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="md:hidden border-t border-gray-100 bg-white">
+        <div className="md:hidden border-t border-zinc-100 bg-white/95 backdrop-blur-lg">
           <div className="px-4 py-4 space-y-3">
             {navLinks.map((link) => (
               <Link
@@ -86,8 +105,8 @@ export default function Navbar() {
                 onClick={() => setIsMenuOpen(false)}
                 className={`block py-2 text-base font-medium ${
                   isActive(link.href)
-                    ? 'text-blue-600'
-                    : 'text-gray-600'
+                    ? 'text-teal-600'
+                    : 'text-zinc-600'
                 }`}
               >
                 {link.label}
@@ -96,7 +115,7 @@ export default function Navbar() {
             <Link
               href="/"
               onClick={() => setIsMenuOpen(false)}
-              className="block w-full py-3 mt-4 bg-blue-600 text-white text-center font-semibold rounded-lg"
+              className="block w-full py-3 mt-4 bg-gradient-to-r from-teal-500 to-teal-600 text-white text-center font-semibold rounded-xl"
             >
               Try Free Calculator
             </Link>
