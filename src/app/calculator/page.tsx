@@ -79,7 +79,7 @@ export default function CalculatorPage() {
   // Form state
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
-  const [salary, setSalary] = useState(100000);
+  const [salary, setSalary] = useState<number | ''>('');
   const [bedrooms, setBedrooms] = useState<'studio' | '1BR' | '2BR' | '3BR' | '4BR'>('1BR');
   const [numAdults, setNumAdults] = useState(1);
   const [children, setChildren] = useState<Child[]>([]);
@@ -109,6 +109,11 @@ export default function CalculatorPage() {
     
     if (!origin || !destination) {
       setError('Please enter both origin and destination cities');
+      return;
+    }
+    
+    if (!salary || salary <= 0) {
+      setError('Please enter your annual salary');
       return;
     }
     
@@ -245,8 +250,9 @@ export default function CalculatorPage() {
                       <input
                         type="number"
                         value={salary}
-                        onChange={(e) => setSalary(Number(e.target.value))}
-                        className="input-modern pl-8"
+                        onChange={(e) => setSalary(e.target.value ? Number(e.target.value) : '')}
+                        className="input-modern pl-10"
+                        placeholder="100,000"
                         min={0}
                         step={1000}
                         required
