@@ -1,773 +1,883 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import citiesData from '@/data/cities-full.json';
 
-interface Child {
+interface City {
   id: string;
-  age: number;
+  name: string;
+  state: string;
+  stateCode: string;
+  population: number;
+  stateTaxRate: number;
+  localTaxRate: number;
+  medianRent1BR: number;
+  medianRent2BR: number;
+  medianRent3BR: number;
+  medianRent4BR: number;
+  costIndex: number;
 }
 
-interface LocationData {
-  location: string;
-  country: string;
-  currency: string;
-  currencySymbol: string;
-  exchangeRateToUSD: number;
-  housing: {
-    rent1BR: number;
-    rent2BR: number;
-    rent3BR: number;
+interface RankedCity extends City {
+  score: number;
+  monthlySavings: number;
+  annualSavings: number;
+  rentForBedrooms: number;
+}
+
+interface DeepDiveData {
+  city: City;
+  breakdown: {
+    housing: number;
+    utilities: number;
+    food: number;
+    transportation: number;
+    healthcare: number;
+    childcare: number;
+    lifestyle: number;
+    taxes: number;
+    total: number;
   };
   quality: {
     safetyIndex: number;
     healthcareIndex: number;
-    costOfLivingIndex: number;
     climateDescription: string;
   };
+  insights: string[];
 }
 
-interface ComparisonResult {
-  origin: LocationData;
-  destination: LocationData;
-  breakdown: {
-    origin: {
-      grossIncome: number;
-      taxes: number;
-      netIncome: number;
-      housing: number;
-      utilities: number;
-      food: number;
-      transportation: number;
-      healthcare: number;
-      childcare: number;
-      lifestyle: number;
-      totalExpenses: number;
-      surplus: number;
-    };
-    destination: {
-      grossIncome: number;
-      taxes: number;
-      netIncome: number;
-      housing: number;
-      utilities: number;
-      food: number;
-      transportation: number;
-      healthcare: number;
-      childcare: number;
-      lifestyle: number;
-      totalExpenses: number;
-      surplus: number;
-    };
-  };
-  comparison: {
-    totalMonthlyCostOrigin: number;
-    totalMonthlyCostDestination: number;
-    costDifferencePercent: number;
-    monthlySurplusOrigin: number;
-    monthlySurplusDestination: number;
-    surplusDifferenceMonthly: number;
-    surplusDifferenceAnnual: number;
-    salaryNeededToMatchLifestyle: number;
-    purchasingPowerIndex: number;
-  };
-  recommendations: string[];
+const cities = citiesData as City[];
+
+// Helper functions
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-US', { 
+    style: 'currency', 
+    currency: 'USD', 
+    maximumFractionDigits: 0 
+  }).format(amount);
+}
+
+function getRentForBedrooms(city: City, bedrooms: string): number {
+  switch (bedrooms) {
+    case 'studio': return city.medianRent1BR * 0.8;
+    case '1BR': return city.medianRent1BR;
+    case '2BR': return city.medianRent2BR;
+    case '3BR': return city.medianRent3BR;
+    case '4BR': return city.medianRent4BR;
+    default: return city.medianRent1BR;
+  }
+}
+
+function calculateMonthlyCost(city: City, salary: number, bedrooms: string, hasCar: boolean, numAdults: number, numChildren: number): number {
+  const rent = getRentForBedrooms(city, bedrooms);
+  const utilities = 150 + (numAdults * 30);
+  const food = numAdults * 400 + numChildren * 250;
+  const transport = hasCar ? 600 : 150;
+  const healthcare = numAdults * 200 + numChildren * 100;
+  const childcare = numChildren * 800;
+  const lifestyle = salary > 100000 ? 500 : salary > 60000 ? 300 : 150;
+  
+  // Adjust by cost index
+  const indexMultiplier = city.costIndex / 100;
+  const baseCost = rent + ((utilities + food + transport + healthcare + lifestyle) * indexMultiplier) + childcare;
+  
+  return baseCost;
+}
+
+function calculateMonthlyTax(salary: number, stateTaxRate: number): number {
+  // Simplified: Federal + State
+  const federalRate = salary > 200000 ? 0.32 : salary > 100000 ? 0.24 : salary > 50000 ? 0.22 : 0.12;
+  const monthlyGross = salary / 12;
+  return monthlyGross * (federalRate + stateTaxRate);
+}
+
+function rankCities(
+  currentCity: City | null,
+  salary: number,
+  bedrooms: string,
+  hasCar: boolean,
+  numAdults: number,
+  numChildren: number,
+  preferences: { lowTax: boolean; bigCity: boolean; lowCost: boolean }
+): RankedCity[] {
+  const currentCost = currentCity 
+    ? calculateMonthlyCost(currentCity, salary, bedrooms, hasCar, numAdults, numChildren) + calculateMonthlyTax(salary, currentCity.stateTaxRate)
+    : salary / 12 * 0.7; // Assume 70% of income for baseline
+    
+  return cities
+    .filter(c => c.population > 50000) // Only cities with 50k+ population
+    .map(city => {
+      const monthlyCost = calculateMonthlyCost(city, salary, bedrooms, hasCar, numAdults, numChildren);
+      const monthlyTax = calculateMonthlyTax(salary, city.stateTaxRate);
+      const totalMonthly = monthlyCost + monthlyTax;
+      const monthlySavings = currentCost - totalMonthly;
+      
+      // Calculate score (higher = better)
+      let score = 50; // Base score
+      
+      // Cost savings weight (max 30 points)
+      score += Math.min(30, Math.max(-30, monthlySavings / 100));
+      
+      // Tax preference
+      if (preferences.lowTax) {
+        score += city.stateTaxRate === 0 ? 15 : -city.stateTaxRate * 100;
+      }
+      
+      // City size preference
+      if (preferences.bigCity) {
+        score += city.population > 500000 ? 10 : city.population > 100000 ? 5 : -5;
+      }
+      
+      // Low cost preference
+      if (preferences.lowCost) {
+        score += city.costIndex < 90 ? 15 : city.costIndex < 100 ? 5 : -10;
+      }
+      
+      return {
+        ...city,
+        score,
+        monthlySavings,
+        annualSavings: monthlySavings * 12,
+        rentForBedrooms: getRentForBedrooms(city, bedrooms),
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 50); // Top 50 for selection
+}
+
+// Email validation
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 export default function CalculatorPage() {
+  // Step tracking
+  const [step, setStep] = useState<'criteria' | 'email' | 'results' | 'deepdive'>('criteria');
+  
+  // User state
+  const [email, setEmail] = useState('');
+  const [isPro, setIsPro] = useState(false);
+  const [creditsRemaining, setCreditsRemaining] = useState(0);
+  
   // Form state
-  const [origin, setOrigin] = useState('');
-  const [destination, setDestination] = useState('');
+  const [currentCitySearch, setCurrentCitySearch] = useState('');
+  const [currentCity, setCurrentCity] = useState<City | null>(null);
   const [salary, setSalary] = useState<number | ''>('');
   const [bedrooms, setBedrooms] = useState<'studio' | '1BR' | '2BR' | '3BR' | '4BR'>('1BR');
   const [numAdults, setNumAdults] = useState(1);
-  const [children, setChildren] = useState<Child[]>([]);
+  const [numChildren, setNumChildren] = useState(0);
   const [hasCar, setHasCar] = useState(false);
-  const [diningOutFrequency, setDiningOutFrequency] = useState<'rarely' | 'sometimes' | 'often'>('sometimes');
-  const [lifestyleLevel, setLifestyleLevel] = useState<'budget' | 'moderate' | 'comfortable' | 'luxury'>('moderate');
+  const [preferences, setPreferences] = useState({
+    lowTax: false,
+    bigCity: false,
+    lowCost: true,
+  });
+  
+  // Results state
+  const [rankedCities, setRankedCities] = useState<RankedCity[]>([]);
+  const [selectedCities, setSelectedCities] = useState<Set<string>>(new Set());
+  const [deepDiveData, setDeepDiveData] = useState<Map<string, DeepDiveData>>(new Map());
+  const [loadingDeepDive, setLoadingDeepDive] = useState<string | null>(null);
   
   // UI state
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<ComparisonResult | null>(null);
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [citySearchResults, setCitySearchResults] = useState<City[]>([]);
   
-  const addChild = () => {
-    setChildren([...children, { id: Math.random().toString(36).substr(2, 9), age: 3 }]);
-  };
-  
-  const removeChild = (id: string) => {
-    setChildren(children.filter(c => c.id !== id));
-  };
-  
-  const updateChildAge = (id: string, age: number) => {
-    setChildren(children.map(c => c.id === id ? { ...c, age } : c));
-  };
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!origin || !destination) {
-      setError('Please enter both origin and destination cities');
+  // City search
+  useEffect(() => {
+    if (currentCitySearch.length < 2) {
+      setCitySearchResults([]);
       return;
     }
+    const search = currentCitySearch.toLowerCase();
+    const results = cities
+      .filter(c => 
+        c.name.toLowerCase().includes(search) || 
+        c.state.toLowerCase().includes(search) ||
+        `${c.name}, ${c.stateCode}`.toLowerCase().includes(search)
+      )
+      .sort((a, b) => b.population - a.population)
+      .slice(0, 8);
+    setCitySearchResults(results);
+    setShowCityDropdown(results.length > 0);
+  }, [currentCitySearch]);
+  
+  // Check user status on mount
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('realocation_email');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      checkUserStatus(savedEmail);
+    }
+  }, []);
+  
+  async function checkUserStatus(userEmail: string) {
+    try {
+      const res = await fetch(`/api/user/status?email=${encodeURIComponent(userEmail)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setIsPro(data.isPro);
+        setCreditsRemaining(data.creditsRemaining || 0);
+      }
+    } catch (e) {
+      console.error('Failed to check user status:', e);
+    }
+  }
+  
+  function handleCriteriaSubmit(e: React.FormEvent) {
+    e.preventDefault();
     
     if (!salary || salary <= 0) {
       setError('Please enter your annual salary');
       return;
     }
     
-    setIsLoading(true);
     setError(null);
-    setResult(null);
     
+    // If already have email, skip to results
+    if (email && isValidEmail(email)) {
+      generateResults();
+      setStep('results');
+    } else {
+      setStep('email');
+    }
+  }
+  
+  function handleEmailSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    
+    if (!isValidEmail(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    
+    setError(null);
+    localStorage.setItem('realocation_email', email);
+    
+    // Generate results first
+    const cities = generateResults();
+    
+    // Save email + choices to backend
+    saveEmail(email, cities);
+    
+    setStep('results');
+  }
+  
+  async function saveEmail(userEmail: string, cities?: RankedCity[]) {
     try {
-      const response = await fetch('/api/research', {
+      await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          origin,
-          destination,
-          salary,
+        body: JSON.stringify({ 
+          email: userEmail, 
+          source: 'calculator',
+          salary: Number(salary),
+          currentCity: currentCity?.name ? `${currentCity.name}, ${currentCity.stateCode}` : null,
           bedrooms,
           numAdults,
-          children: children.map(c => ({ age: c.age })),
+          numChildren,
           hasCar,
-          diningOutFrequency,
-          lifestyleLevel,
+          preferences,
+          topCities: cities?.slice(0, 10).map(c => ({
+            id: c.id,
+            name: c.name,
+            state: c.stateCode,
+            score: c.score,
+            monthlySavings: c.monthlySavings,
+          })),
         }),
       });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to calculate comparison');
-      }
-      
-      setResult(data.data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
-    } finally {
-      setIsLoading(false);
+      checkUserStatus(userEmail);
+    } catch (e) {
+      console.error('Failed to save email:', e);
     }
-  };
+  }
   
-  const formatCurrency = (amount: number, symbol = '$') => {
-    return `${symbol}${Math.abs(amount).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-  };
+  function generateResults(): RankedCity[] {
+    const ranked = rankCities(
+      currentCity,
+      Number(salary),
+      bedrooms,
+      hasCar,
+      numAdults,
+      numChildren,
+      preferences
+    );
+    setRankedCities(ranked);
+    return ranked;
+  }
   
-  const formatPercent = (value: number) => {
-    const sign = value > 0 ? '+' : '';
-    return `${sign}${value.toFixed(1)}%`;
-  };
-
+  function toggleCitySelection(cityId: string) {
+    const newSelected = new Set(selectedCities);
+    if (newSelected.has(cityId)) {
+      newSelected.delete(cityId);
+    } else {
+      if (newSelected.size >= 3 && !isPro) {
+        setError('Free users can select up to 3 cities. Upgrade to Pro for unlimited!');
+        return;
+      }
+      newSelected.add(cityId);
+    }
+    setSelectedCities(newSelected);
+    setError(null);
+  }
+  
+  async function handleGetDeepDive() {
+    if (selectedCities.size === 0) {
+      setError('Please select at least one city');
+      return;
+    }
+    
+    if (!isPro && creditsRemaining < selectedCities.size) {
+      // Redirect to checkout
+      handleCheckout();
+      return;
+    }
+    
+    setStep('deepdive');
+    
+    // Fetch deep dive for each selected city
+    for (const cityId of selectedCities) {
+      if (deepDiveData.has(cityId)) continue;
+      
+      setLoadingDeepDive(cityId);
+      try {
+        const res = await fetch('/api/deep-dive', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            cityId,
+            originCity: currentCity?.id,
+            salary,
+            bedrooms,
+            numAdults,
+            numChildren,
+            hasCar,
+          }),
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          setDeepDiveData(prev => new Map(prev).set(cityId, data.report));
+          setCreditsRemaining(data.creditsRemaining);
+        } else {
+          const error = await res.json();
+          throw new Error(error.error || 'Failed to get report');
+        }
+      } catch (e) {
+        console.error('Deep dive error:', e);
+        setError(e instanceof Error ? e.message : 'Failed to generate report');
+      }
+    }
+    setLoadingDeepDive(null);
+  }
+  
+  async function handleCheckout() {
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      
+      if (res.ok) {
+        const { url } = await res.json();
+        window.location.href = url;
+      }
+    } catch (e) {
+      console.error('Checkout error:', e);
+      setError('Failed to start checkout');
+    }
+  }
+  
   return (
     <>
       <Navbar />
       
-      <main className="min-h-screen bg-zinc-50">
-        {/* Header */}
-        <div className="bg-gradient-to-br from-teal-600 via-teal-700 to-teal-800 text-white py-16">
-          <div className="max-w-6xl mx-auto px-4">
-            <div className="max-w-3xl">
-              <span className="inline-block px-3 py-1 bg-white/10 rounded-full text-sm font-medium mb-4">
-                AI-Powered Calculator
-              </span>
-              <h1 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight">
-                Global Cost Comparison
-              </h1>
-              <p className="text-xl text-teal-100">
-                Compare any two cities worldwide with real-time data on housing, taxes, childcare, and lifestyle costs.
-              </p>
+      <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+        {/* Hero */}
+        <section className="bg-gradient-to-br from-teal-600 via-teal-700 to-emerald-800 text-white py-12">
+          <div className="max-w-4xl mx-auto px-4 text-center">
+            <h1 className="text-3xl sm:text-4xl font-bold mb-3">
+              Find Your Best City
+            </h1>
+            <p className="text-teal-100 text-lg">
+              Get personalized recommendations based on your income and lifestyle
+            </p>
+            
+            {/* Progress steps */}
+            <div className="flex items-center justify-center gap-2 mt-8">
+              {['criteria', 'email', 'results', 'deepdive'].map((s, i) => (
+                <div key={s} className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+                    ${step === s ? 'bg-white text-teal-700' : 
+                      ['criteria', 'email', 'results', 'deepdive'].indexOf(step) > i 
+                        ? 'bg-teal-400 text-white' 
+                        : 'bg-teal-800 text-teal-400'}`}
+                  >
+                    {i + 1}
+                  </div>
+                  {i < 3 && <div className={`w-8 h-0.5 ${['criteria', 'email', 'results', 'deepdive'].indexOf(step) > i ? 'bg-teal-400' : 'bg-teal-800'}`} />}
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        </section>
         
-        <div className="max-w-6xl mx-auto px-4 py-12">
-          <div className="grid lg:grid-cols-5 gap-8">
-            {/* Form */}
-            <div className="lg:col-span-2">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Location Inputs */}
-                <div className="card p-6">
-                  <h2 className="text-lg font-semibold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span className="w-8 h-8 bg-teal-100 text-teal-600 rounded-lg flex items-center justify-center text-sm font-bold">1</span>
-                    Locations
-                  </h2>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-700 mb-2">
-                        Where do you live now?
-                      </label>
-                      <input
-                        type="text"
-                        value={origin}
-                        onChange={(e) => setOrigin(e.target.value)}
-                        placeholder="e.g., San Francisco, USA"
-                        className="input-modern"
-                        required
-                      />
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          {/* Error display */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
+              {error}
+            </div>
+          )}
+          
+          {/* Step 1: Criteria */}
+          {step === 'criteria' && (
+            <form onSubmit={handleCriteriaSubmit} className="max-w-2xl mx-auto">
+              <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 space-y-6">
+                <h2 className="text-xl font-bold text-gray-900">Tell us about yourself</h2>
+                
+                {/* Current city */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Where do you live now? (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={currentCity ? `${currentCity.name}, ${currentCity.stateCode}` : currentCitySearch}
+                    onChange={(e) => {
+                      setCurrentCitySearch(e.target.value);
+                      setCurrentCity(null);
+                    }}
+                    onFocus={() => currentCitySearch.length >= 2 && setShowCityDropdown(true)}
+                    placeholder="e.g., San Francisco, CA"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  />
+                  {showCityDropdown && citySearchResults.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+                      {citySearchResults.map(city => (
+                        <button
+                          key={city.id}
+                          type="button"
+                          onClick={() => {
+                            setCurrentCity(city);
+                            setCurrentCitySearch('');
+                            setShowCityDropdown(false);
+                          }}
+                          className="w-full px-4 py-3 text-left hover:bg-teal-50 flex justify-between items-center"
+                        >
+                          <span className="font-medium">{city.name}, {city.stateCode}</span>
+                          <span className="text-sm text-gray-500">{city.population.toLocaleString()} pop</span>
+                        </button>
+                      ))}
                     </div>
-                    
-                    <div className="flex justify-center">
-                      <div className="w-10 h-10 bg-zinc-100 rounded-full flex items-center justify-center">
-                        <svg className="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                        </svg>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-700 mb-2">
-                        Where are you considering?
-                      </label>
-                      <input
-                        type="text"
-                        value={destination}
-                        onChange={(e) => setDestination(e.target.value)}
-                        placeholder="e.g., Lisbon, Portugal"
-                        className="input-modern"
-                        required
-                      />
-                    </div>
-                  </div>
+                  )}
                 </div>
                 
-                {/* Income */}
-                <div className="card p-6">
-                  <h2 className="text-lg font-semibold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span className="w-8 h-8 bg-teal-100 text-teal-600 rounded-lg flex items-center justify-center text-sm font-bold">2</span>
-                    Income
-                  </h2>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-2">
-                      Annual salary (in your current currency)
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-medium">$</span>
-                      <input
-                        type="number"
-                        value={salary}
-                        onChange={(e) => setSalary(e.target.value ? Number(e.target.value) : '')}
-                        className="input-modern"
-                        style={{ paddingLeft: '2.5rem' }}
-                        placeholder="100,000"
-                        min={0}
-                        step={1000}
-                        required
-                      />
-                    </div>
-                    <p className="text-xs text-zinc-500 mt-2">We'll convert to local currency automatically</p>
+                {/* Salary */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Annual household income (USD) *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                    <input
+                      type="number"
+                      value={salary}
+                      onChange={(e) => setSalary(e.target.value ? Number(e.target.value) : '')}
+                      placeholder="100,000"
+                      required
+                      className="w-full pl-8 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    />
                   </div>
                 </div>
                 
                 {/* Household */}
-                <div className="card p-6">
-                  <h2 className="text-lg font-semibold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span className="w-8 h-8 bg-teal-100 text-teal-600 rounded-lg flex items-center justify-center text-sm font-bold">3</span>
-                    Household
-                  </h2>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-700 mb-2">
-                        Number of adults
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setNumAdults(Math.max(1, numAdults - 1))}
-                          className="w-10 h-10 bg-zinc-100 hover:bg-zinc-200 rounded-lg flex items-center justify-center transition-colors"
-                        >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                          </svg>
-                        </button>
-                        <span className="w-12 text-center text-xl font-semibold">{numAdults}</span>
-                        <button
-                          type="button"
-                          onClick={() => setNumAdults(Math.min(6, numAdults + 1))}
-                          className="w-10 h-10 bg-zinc-100 hover:bg-zinc-200 rounded-lg flex items-center justify-center transition-colors"
-                        >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-700 mb-2">
-                        Children
-                      </label>
-                      {children.length === 0 ? (
-                        <p className="text-sm text-zinc-500 mb-3">No children added</p>
-                      ) : (
-                        <div className="space-y-2 mb-3">
-                          {children.map((child, index) => (
-                            <div key={child.id} className="flex items-center gap-3 bg-zinc-50 p-3 rounded-lg">
-                              <span className="text-sm text-zinc-600">Child {index + 1}</span>
-                              <select
-                                value={child.age}
-                                onChange={(e) => updateChildAge(child.id, Number(e.target.value))}
-                                className="flex-1 px-3 py-2 border border-zinc-200 rounded-lg text-sm"
-                              >
-                                {[...Array(18)].map((_, i) => (
-                                  <option key={i} value={i}>{i} {i === 1 ? 'year' : 'years'} old</option>
-                                ))}
-                              </select>
-                              <button
-                                type="button"
-                                onClick={() => removeChild(child.id)}
-                                className="text-zinc-400 hover:text-red-500 transition-colors"
-                              >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Adults</label>
+                    <select
+                      value={numAdults}
+                      onChange={(e) => setNumAdults(Number(e.target.value))}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500"
+                    >
+                      {[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Children</label>
+                    <select
+                      value={numChildren}
+                      onChange={(e) => setNumChildren(Number(e.target.value))}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500"
+                    >
+                      {[0, 1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                </div>
+                
+                {/* Bedrooms */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Housing preference</label>
+                  <div className="flex gap-2">
+                    {(['studio', '1BR', '2BR', '3BR', '4BR'] as const).map(br => (
                       <button
+                        key={br}
                         type="button"
-                        onClick={addChild}
-                        className="text-sm text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1"
+                        onClick={() => setBedrooms(br)}
+                        className={`flex-1 py-3 rounded-xl text-sm font-medium transition
+                          ${bedrooms === br 
+                            ? 'bg-teal-600 text-white' 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                       >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        Add child
+                        {br}
                       </button>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-700 mb-2">
-                        Housing preference
-                      </label>
-                      <div className="grid grid-cols-5 gap-2">
-                        {(['studio', '1BR', '2BR', '3BR', '4BR'] as const).map((option) => (
-                          <button
-                            key={option}
-                            type="button"
-                            onClick={() => setBedrooms(option)}
-                            className={`py-2 px-3 text-sm font-medium rounded-lg border transition-all ${
-                              bedrooms === option
-                                ? 'bg-teal-600 text-white border-teal-600'
-                                : 'bg-white text-zinc-700 border-zinc-200 hover:border-teal-300'
-                            }`}
-                          >
-                            {option}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
                 
-                {/* Lifestyle */}
-                <div className="card p-6">
-                  <h2 className="text-lg font-semibold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span className="w-8 h-8 bg-teal-100 text-teal-600 rounded-lg flex items-center justify-center text-sm font-bold">4</span>
-                    Lifestyle
-                  </h2>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-700 mb-2">
-                        Lifestyle level
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {([
-                          { value: 'budget', label: 'Budget', emoji: '💰' },
-                          { value: 'moderate', label: 'Moderate', emoji: '⚖️' },
-                          { value: 'comfortable', label: 'Comfortable', emoji: '🛋️' },
-                          { value: 'luxury', label: 'Luxury', emoji: '✨' },
-                        ] as const).map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => setLifestyleLevel(option.value)}
-                            className={`py-3 px-4 text-sm font-medium rounded-lg border transition-all flex items-center gap-2 ${
-                              lifestyleLevel === option.value
-                                ? 'bg-teal-600 text-white border-teal-600'
-                                : 'bg-white text-zinc-700 border-zinc-200 hover:border-teal-300'
-                            }`}
-                          >
-                            <span>{option.emoji}</span>
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-700 mb-2">
-                        Dining out frequency
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {([
-                          { value: 'rarely', label: 'Rarely', sub: '1-2x/month' },
-                          { value: 'sometimes', label: 'Sometimes', sub: '1-2x/week' },
-                          { value: 'often', label: 'Often', sub: '3-4x/week' },
-                        ] as const).map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => setDiningOutFrequency(option.value)}
-                            className={`py-3 px-3 text-sm rounded-lg border transition-all ${
-                              diningOutFrequency === option.value
-                                ? 'bg-teal-600 text-white border-teal-600'
-                                : 'bg-white text-zinc-700 border-zinc-200 hover:border-teal-300'
-                            }`}
-                          >
-                            <div className="font-medium">{option.label}</div>
-                            <div className={`text-xs mt-0.5 ${diningOutFrequency === option.value ? 'text-teal-100' : 'text-zinc-400'}`}>
-                              {option.sub}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={hasCar}
-                          onChange={(e) => setHasCar(e.target.checked)}
-                          className="w-5 h-5 rounded border-zinc-300 text-teal-600 focus:ring-teal-500"
-                        />
-                        <div>
-                          <span className="text-sm font-medium text-zinc-700">I have/want a car</span>
-                          <p className="text-xs text-zinc-500">Includes insurance, fuel, parking costs</p>
-                        </div>
-                      </label>
-                    </div>
+                {/* Car */}
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasCar}
+                    onChange={(e) => setHasCar(e.target.checked)}
+                    className="w-5 h-5 rounded border-gray-300 text-teal-600"
+                  />
+                  <span className="text-gray-700">I have/want a car</span>
+                </label>
+                
+                {/* Preferences */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">What matters most?</label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { key: 'lowTax', label: '🏦 Low taxes' },
+                      { key: 'bigCity', label: '🏙️ Big city' },
+                      { key: 'lowCost', label: '💰 Low cost' },
+                    ].map(pref => (
+                      <button
+                        key={pref.key}
+                        type="button"
+                        onClick={() => setPreferences(p => ({ ...p, [pref.key]: !p[pref.key as keyof typeof p] }))}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition
+                          ${preferences[pref.key as keyof typeof preferences]
+                            ? 'bg-teal-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                      >
+                        {pref.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
                 
-                {/* Submit */}
                 <button
                   type="submit"
-                  disabled={isLoading || !origin || !destination}
-                  className="w-full py-4 px-6 text-lg font-semibold text-white 
-                           bg-gradient-to-r from-teal-500 to-teal-600
-                           rounded-xl hover:from-teal-600 hover:to-teal-700
-                           focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 
-                           transition-all disabled:opacity-50 disabled:cursor-not-allowed
-                           shadow-lg shadow-teal-500/25"
+                  className="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-bold text-lg rounded-xl hover:from-teal-600 hover:to-emerald-700 transition shadow-lg"
                 >
-                  {isLoading ? (
-                    <span className="flex items-center justify-center gap-3">
-                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Researching locations...
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-2">
-                      Compare Cities
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                      </svg>
-                    </span>
-                  )}
+                  Find My Best Cities →
+                </button>
+              </div>
+            </form>
+          )}
+          
+          {/* Step 2: Email gate */}
+          {step === 'email' && (
+            <form onSubmit={handleEmailSubmit} className="max-w-md mx-auto">
+              <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 text-center">
+                <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Almost there!</h2>
+                <p className="text-gray-600 mb-6">
+                  Enter your email to see your personalized Top 10 cities. We&apos;ll save your results so you can access them anytime.
+                </p>
+                
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent mb-4"
+                />
+                
+                <button
+                  type="submit"
+                  className="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-bold rounded-xl hover:from-teal-600 hover:to-emerald-700 transition"
+                >
+                  Show My Results
                 </button>
                 
-                {error && (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-                    {error}
+                <p className="text-xs text-gray-500 mt-4">
+                  We respect your privacy. No spam, ever.
+                </p>
+              </div>
+            </form>
+          )}
+          
+          {/* Step 3: Results (Top 10) */}
+          {step === 'results' && (
+            <div className="space-y-6">
+              {/* Summary header */}
+              <div className="bg-white rounded-2xl shadow-lg p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Your Top Cities</h2>
+                    <p className="text-gray-600">
+                      Based on {formatCurrency(Number(salary))}/year income • {numAdults} adult{numAdults > 1 ? 's' : ''}{numChildren > 0 ? ` • ${numChildren} child${numChildren > 1 ? 'ren' : ''}` : ''}
+                    </p>
                   </div>
+                  {isPro && (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium">
+                      <span>⭐</span> Pro • {creditsRemaining} reports left
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Top 10 list */}
+              <div className="grid gap-4">
+                {rankedCities.slice(0, 10).map((city, index) => (
+                  <div
+                    key={city.id}
+                    className={`bg-white rounded-xl border-2 p-4 sm:p-6 transition cursor-pointer
+                      ${selectedCities.has(city.id) 
+                        ? 'border-teal-500 bg-teal-50' 
+                        : 'border-gray-100 hover:border-teal-200'}`}
+                    onClick={() => toggleCitySelection(city.id)}
+                  >
+                    <div className="flex items-start gap-4">
+                      {/* Rank */}
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg
+                        ${index < 3 ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                        {index + 1}
+                      </div>
+                      
+                      {/* City info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h3 className="font-bold text-lg text-gray-900">{city.name}, {city.stateCode}</h3>
+                            <p className="text-sm text-gray-500">
+                              {city.population > 1000000 ? 'Major Metro' : city.population > 500000 ? 'Large City' : city.population > 100000 ? 'Mid-Size City' : 'Small City'}
+                              {' • '}{city.population.toLocaleString()} pop
+                            </p>
+                          </div>
+                          
+                          {/* Savings badge */}
+                          {city.monthlySavings > 0 ? (
+                            <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium whitespace-nowrap">
+                              Save {formatCurrency(city.monthlySavings)}/mo
+                            </div>
+                          ) : city.monthlySavings < -200 ? (
+                            <div className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium whitespace-nowrap">
+                              +{formatCurrency(Math.abs(city.monthlySavings))}/mo
+                            </div>
+                          ) : null}
+                        </div>
+                        
+                        {/* Quick stats */}
+                        <div className="flex flex-wrap gap-3 mt-3">
+                          <span className="text-sm text-gray-600">
+                            🏠 {formatCurrency(city.rentForBedrooms)}/mo rent
+                          </span>
+                          <span className="text-sm text-gray-600">
+                            {city.stateTaxRate === 0 ? '✨ No state tax!' : `📊 ${(city.stateTaxRate * 100).toFixed(1)}% state tax`}
+                          </span>
+                          <span className={`text-sm ${city.costIndex < 100 ? 'text-green-600' : 'text-gray-600'}`}>
+                            💰 Cost index: {city.costIndex}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Selection checkbox */}
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center
+                        ${selectedCities.has(city.id) ? 'border-teal-500 bg-teal-500' : 'border-gray-300'}`}>
+                        {selectedCities.has(city.id) && (
+                          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* CTA */}
+              <div className="bg-gradient-to-r from-teal-600 to-emerald-600 rounded-2xl p-6 sm:p-8 text-white">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <h3 className="text-xl font-bold mb-1">
+                      {selectedCities.size > 0 
+                        ? `Get detailed reports for ${selectedCities.size} ${selectedCities.size === 1 ? 'city' : 'cities'}`
+                        : 'Select cities for detailed analysis'}
+                    </h3>
+                    <p className="text-teal-100">
+                      {isPro 
+                        ? `You have ${creditsRemaining} reports remaining`
+                        : 'Full breakdown: housing, taxes, lifestyle costs, schools & more'}
+                    </p>
+                  </div>
+                  
+                  <button
+                    onClick={handleGetDeepDive}
+                    disabled={selectedCities.size === 0}
+                    className={`px-8 py-4 rounded-xl font-bold text-lg transition whitespace-nowrap
+                      ${selectedCities.size > 0
+                        ? 'bg-white text-teal-700 hover:bg-teal-50'
+                        : 'bg-teal-700 text-teal-400 cursor-not-allowed'}`}
+                  >
+                    {isPro ? 'Generate Reports →' : `Unlock for $39 →`}
+                  </button>
+                </div>
+                
+                {!isPro && (
+                  <p className="text-teal-200 text-sm mt-4">
+                    ✓ 3 detailed city reports • ✓ PDF export • ✓ Lifetime access
+                  </p>
                 )}
-              </form>
+              </div>
+              
+              {/* Edit criteria */}
+              <button
+                onClick={() => setStep('criteria')}
+                className="text-teal-600 font-medium hover:underline"
+              >
+                ← Edit my criteria
+              </button>
             </div>
-            
-            {/* Results */}
-            <div className="lg:col-span-3">
-              {!result && !isLoading && (
-                <div className="card p-12 text-center">
-                  <div className="w-20 h-20 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <svg className="w-10 h-10 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-zinc-900 mb-2">Enter your details</h3>
-                  <p className="text-zinc-500 max-w-sm mx-auto">
-                    Fill out the form to see a comprehensive cost comparison between your two cities.
-                  </p>
+          )}
+          
+          {/* Step 4: Deep Dive */}
+          {step === 'deepdive' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-900">Detailed Reports</h2>
+                <button
+                  onClick={() => setStep('results')}
+                  className="text-teal-600 font-medium hover:underline"
+                >
+                  ← Back to Top 10
+                </button>
+              </div>
+              
+              {/* Loading state */}
+              {loadingDeepDive && (
+                <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+                  <div className="w-16 h-16 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900">Researching {rankedCities.find(c => c.id === loadingDeepDive)?.name}...</h3>
+                  <p className="text-gray-500">Gathering real-time data on costs, schools, neighborhoods & more</p>
                 </div>
               )}
               
-              {isLoading && (
-                <div className="card p-12 text-center">
-                  <div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <svg className="w-10 h-10 text-teal-500 animate-spin" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-zinc-900 mb-2">Researching locations...</h3>
-                  <p className="text-zinc-500 max-w-sm mx-auto">
-                    Our AI is gathering real-time data on housing, taxes, childcare, and cost of living. This may take 10-20 seconds.
-                  </p>
-                </div>
-              )}
-              
-              {result && (
-                <div className="space-y-6">
-                  {/* Summary Card */}
-                  <div className="card p-6 bg-gradient-to-br from-teal-600 to-teal-700 text-white">
-                    <div className="flex items-start justify-between mb-6">
-                      <div>
-                        <p className="text-teal-100 text-sm">Monthly surplus difference</p>
-                        <p className="text-4xl font-bold">
-                          {result.comparison.surplusDifferenceMonthly >= 0 ? '+' : ''}
-                          {formatCurrency(result.comparison.surplusDifferenceMonthly)}
-                        </p>
-                        <p className="text-teal-100 text-sm mt-1">
-                          {result.comparison.surplusDifferenceAnnual >= 0 ? '+' : ''}
-                          {formatCurrency(result.comparison.surplusDifferenceAnnual)}/year
-                        </p>
-                      </div>
-                      <div className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                        result.comparison.surplusDifferenceMonthly >= 0 
-                          ? 'bg-green-400/20 text-green-100' 
-                          : 'bg-red-400/20 text-red-100'
-                      }`}>
-                        {result.comparison.surplusDifferenceMonthly >= 0 ? '↑ Better off' : '↓ Worse off'}
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white/10 rounded-xl p-4">
-                        <p className="text-teal-100 text-xs uppercase tracking-wide mb-1">Cost of Living</p>
-                        <p className="text-2xl font-bold">{formatPercent(result.comparison.costDifferencePercent)}</p>
-                        <p className="text-teal-100 text-sm">
-                          {result.comparison.costDifferencePercent < 0 ? 'Cheaper' : 'More expensive'}
-                        </p>
-                      </div>
-                      <div className="bg-white/10 rounded-xl p-4">
-                        <p className="text-teal-100 text-xs uppercase tracking-wide mb-1">Purchasing Power</p>
-                        <p className="text-2xl font-bold">{result.comparison.purchasingPowerIndex}</p>
-                        <p className="text-teal-100 text-sm">
-                          {result.comparison.purchasingPowerIndex > 100 ? 'More buying power' : 'Less buying power'}
-                        </p>
-                      </div>
-                    </div>
+              {/* Deep dive cards */}
+              {Array.from(deepDiveData.entries()).map(([cityId, data]) => (
+                <div key={cityId} className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-teal-600 to-emerald-600 p-6 text-white">
+                    <h3 className="text-2xl font-bold">{data.city.name}, {data.city.stateCode}</h3>
+                    <p className="text-teal-100">{data.city.state} • Population: {data.city.population.toLocaleString()}</p>
                   </div>
                   
-                  {/* Location Cards */}
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="card p-6">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 bg-zinc-100 rounded-full flex items-center justify-center">
-                          <span className="text-lg">📍</span>
-                        </div>
-                        <div>
-                          <p className="text-xs text-zinc-500 uppercase tracking-wide">Current</p>
-                          <h3 className="font-semibold text-zinc-900">{result.origin.location}</h3>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-zinc-500">Monthly surplus</span>
-                          <span className="font-semibold">{formatCurrency(result.comparison.monthlySurplusOrigin)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-zinc-500">Monthly costs</span>
-                          <span className="font-medium">{formatCurrency(result.comparison.totalMonthlyCostOrigin)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-zinc-500">Currency</span>
-                          <span className="font-medium">{result.origin.currency}</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="card p-6 border-teal-200 bg-teal-50/30">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
-                          <span className="text-lg">🎯</span>
-                        </div>
-                        <div>
-                          <p className="text-xs text-teal-600 uppercase tracking-wide">Destination</p>
-                          <h3 className="font-semibold text-zinc-900">{result.destination.location}</h3>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-zinc-500">Monthly surplus</span>
-                          <span className="font-semibold text-teal-700">{formatCurrency(result.comparison.monthlySurplusDestination)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-zinc-500">Monthly costs</span>
-                          <span className="font-medium">{formatCurrency(result.comparison.totalMonthlyCostDestination)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-zinc-500">Currency</span>
-                          <span className="font-medium">{result.destination.currency}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Detailed Breakdown */}
-                  <div className="card p-6">
-                    <h3 className="font-semibold text-zinc-900 mb-4">Monthly Cost Breakdown (USD)</h3>
+                  {/* Cost breakdown */}
+                  <div className="p-6">
+                    <h4 className="font-bold text-gray-900 mb-4">Monthly Cost Breakdown</h4>
                     <div className="space-y-3">
                       {[
-                        { label: 'Housing', origin: result.breakdown.origin.housing, dest: result.breakdown.destination.housing, icon: '🏠' },
-                        { label: 'Utilities', origin: result.breakdown.origin.utilities, dest: result.breakdown.destination.utilities, icon: '💡' },
-                        { label: 'Food', origin: result.breakdown.origin.food, dest: result.breakdown.destination.food, icon: '🍕' },
-                        { label: 'Transportation', origin: result.breakdown.origin.transportation, dest: result.breakdown.destination.transportation, icon: '🚗' },
-                        { label: 'Healthcare', origin: result.breakdown.origin.healthcare, dest: result.breakdown.destination.healthcare, icon: '🏥' },
-                        { label: 'Childcare', origin: result.breakdown.origin.childcare, dest: result.breakdown.destination.childcare, icon: '👶' },
-                        { label: 'Lifestyle', origin: result.breakdown.origin.lifestyle, dest: result.breakdown.destination.lifestyle, icon: '🎭' },
-                      ].filter(item => item.origin > 0 || item.dest > 0).map((item) => (
-                        <div key={item.label} className="flex items-center gap-4">
-                          <span className="text-lg w-8">{item.icon}</span>
-                          <span className="flex-1 text-sm text-zinc-700">{item.label}</span>
-                          <span className="w-24 text-right text-sm text-zinc-500">
-                            {formatCurrency(item.origin * result.origin.exchangeRateToUSD)}
+                        { label: 'Housing', value: data.breakdown.housing, icon: '🏠' },
+                        { label: 'Utilities', value: data.breakdown.utilities, icon: '💡' },
+                        { label: 'Food', value: data.breakdown.food, icon: '🍕' },
+                        { label: 'Transportation', value: data.breakdown.transportation, icon: '🚗' },
+                        { label: 'Healthcare', value: data.breakdown.healthcare, icon: '🏥' },
+                        { label: 'Childcare', value: data.breakdown.childcare, icon: '👶' },
+                        { label: 'Lifestyle', value: data.breakdown.lifestyle, icon: '🎭' },
+                        { label: 'Taxes', value: data.breakdown.taxes, icon: '📊' },
+                      ].filter(item => item.value > 0).map(item => (
+                        <div key={item.label} className="flex items-center justify-between py-2 border-b border-gray-100">
+                          <span className="flex items-center gap-2">
+                            <span>{item.icon}</span>
+                            <span className="text-gray-700">{item.label}</span>
                           </span>
-                          <div className="w-8 flex justify-center">
-                            {item.dest < item.origin ? (
-                              <span className="text-green-500">↓</span>
-                            ) : item.dest > item.origin ? (
-                              <span className="text-red-500">↑</span>
-                            ) : (
-                              <span className="text-zinc-300">=</span>
-                            )}
-                          </div>
-                          <span className={`w-24 text-right text-sm font-medium ${
-                            item.dest < item.origin ? 'text-green-600' : item.dest > item.origin ? 'text-red-600' : 'text-zinc-700'
-                          }`}>
-                            {formatCurrency(item.dest * result.destination.exchangeRateToUSD)}
-                          </span>
+                          <span className="font-semibold">{formatCurrency(item.value)}</span>
                         </div>
                       ))}
-                      
-                      <div className="border-t border-zinc-200 pt-3 mt-3">
-                        <div className="flex items-center gap-4">
-                          <span className="text-lg w-8">💰</span>
-                          <span className="flex-1 text-sm font-semibold text-zinc-900">Total Expenses</span>
-                          <span className="w-24 text-right text-sm font-semibold">
-                            {formatCurrency(result.comparison.totalMonthlyCostOrigin)}
-                          </span>
-                          <div className="w-8"></div>
-                          <span className={`w-24 text-right text-sm font-semibold ${
-                            result.comparison.totalMonthlyCostDestination < result.comparison.totalMonthlyCostOrigin 
-                              ? 'text-green-600' 
-                              : 'text-red-600'
-                          }`}>
-                            {formatCurrency(result.comparison.totalMonthlyCostDestination)}
-                          </span>
-                        </div>
+                      <div className="flex items-center justify-between py-3 font-bold text-lg">
+                        <span>Total Monthly</span>
+                        <span className="text-teal-600">{formatCurrency(data.breakdown.total)}</span>
                       </div>
                     </div>
                   </div>
                   
-                  {/* Recommendations */}
-                  {result.recommendations.length > 0 && (
-                    <div className="card p-6 bg-amber-50 border-amber-200">
-                      <h3 className="font-semibold text-amber-900 mb-3 flex items-center gap-2">
-                        <span>💡</span> Key Insights
-                      </h3>
+                  {/* Quality of life */}
+                  <div className="p-6 bg-gray-50">
+                    <h4 className="font-bold text-gray-900 mb-4">Quality of Life</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-500">Safety Index</p>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-gray-200 rounded-full">
+                            <div className="h-2 bg-teal-500 rounded-full" style={{ width: `${data.quality.safetyIndex}%` }} />
+                          </div>
+                          <span className="font-medium">{data.quality.safetyIndex}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Healthcare Index</p>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-gray-200 rounded-full">
+                            <div className="h-2 bg-teal-500 rounded-full" style={{ width: `${data.quality.healthcareIndex}%` }} />
+                          </div>
+                          <span className="font-medium">{data.quality.healthcareIndex}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <p className="text-sm text-gray-500">Climate</p>
+                      <p className="text-gray-900">{data.quality.climateDescription}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Insights */}
+                  {data.insights.length > 0 && (
+                    <div className="p-6">
+                      <h4 className="font-bold text-gray-900 mb-3">💡 Key Insights</h4>
                       <ul className="space-y-2">
-                        {result.recommendations.map((rec, i) => (
-                          <li key={i} className="text-sm text-amber-800 flex items-start gap-2">
-                            <span className="text-amber-500 mt-0.5">•</span>
-                            {rec}
+                        {data.insights.map((insight, i) => (
+                          <li key={i} className="flex items-start gap-2 text-gray-700">
+                            <span className="text-teal-500">•</span>
+                            {insight}
                           </li>
                         ))}
                       </ul>
                     </div>
                   )}
-                  
-                  {/* Salary Needed */}
-                  <div className="card p-6">
-                    <h3 className="font-semibold text-zinc-900 mb-2">Salary to maintain lifestyle</h3>
-                    <p className="text-sm text-zinc-500 mb-4">
-                      To keep the same monthly surplus in {result.destination.location}, you'd need:
-                    </p>
-                    <div className="text-3xl font-bold text-teal-600">
-                      {result.destination.currencySymbol}{result.comparison.salaryNeededToMatchLifestyle.toLocaleString()}/year
-                    </div>
-                    <p className="text-sm text-zinc-500 mt-2">
-                      in {result.destination.currency} (local currency)
-                    </p>
-                  </div>
-                  
-                  {/* Quality of Life */}
-                  <div className="card p-6">
-                    <h3 className="font-semibold text-zinc-900 mb-4">Quality of Life Comparison</h3>
-                    <div className="grid grid-cols-2 gap-6">
-                      {[
-                        { 
-                          label: 'Safety', 
-                          origin: result.origin.quality.safetyIndex, 
-                          dest: result.destination.quality.safetyIndex,
-                          higherBetter: true 
-                        },
-                        { 
-                          label: 'Healthcare', 
-                          origin: result.origin.quality.healthcareIndex, 
-                          dest: result.destination.quality.healthcareIndex,
-                          higherBetter: true 
-                        },
-                        { 
-                          label: 'Cost Index', 
-                          origin: result.origin.quality.costOfLivingIndex, 
-                          dest: result.destination.quality.costOfLivingIndex,
-                          higherBetter: false 
-                        },
-                      ].map((metric) => (
-                        <div key={metric.label}>
-                          <p className="text-sm text-zinc-500 mb-2">{metric.label}</p>
-                          <div className="flex items-center gap-4">
-                            <div className="flex-1">
-                              <div className="h-2 bg-zinc-100 rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full bg-zinc-400 rounded-full"
-                                  style={{ width: `${metric.origin}%` }}
-                                />
-                              </div>
-                              <p className="text-xs text-zinc-400 mt-1">{metric.origin}</p>
-                            </div>
-                            <div className="flex-1">
-                              <div className="h-2 bg-teal-100 rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full bg-teal-500 rounded-full"
-                                  style={{ width: `${metric.dest}%` }}
-                                />
-                              </div>
-                              <p className="text-xs text-teal-600 mt-1">{metric.dest}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <div className="mt-6 pt-4 border-t border-zinc-100">
-                      <p className="text-sm text-zinc-500 mb-1">Climate</p>
-                      <p className="text-sm">
-                        <span className="font-medium text-zinc-700">{result.origin.location}:</span>{' '}
-                        <span className="text-zinc-600">{result.origin.quality.climateDescription}</span>
-                      </p>
-                      <p className="text-sm mt-1">
-                        <span className="font-medium text-teal-700">{result.destination.location}:</span>{' '}
-                        <span className="text-zinc-600">{result.destination.quality.climateDescription}</span>
-                      </p>
-                    </div>
-                  </div>
+                </div>
+              ))}
+              
+              {/* Add more cities */}
+              {creditsRemaining > 0 && (
+                <div className="text-center">
+                  <button
+                    onClick={() => setStep('results')}
+                    className="text-teal-600 font-medium hover:underline"
+                  >
+                    + Research more cities ({creditsRemaining} reports remaining)
+                  </button>
                 </div>
               )}
             </div>
-          </div>
+          )}
         </div>
       </main>
       

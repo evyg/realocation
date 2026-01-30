@@ -89,8 +89,51 @@ export default async function CityPage({ params }: { params: Promise<{ slug: str
   const rentDiff = city.medianRent1BR - nationalAvgRent;
   const rentDiffPercent = Math.round((rentDiff / nationalAvgRent) * 100);
   
+  // FAQ Schema for rich snippets
+  const faqJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: `What is the cost of living in ${city.name}, ${city.stateCode}?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: `${city.name} has a cost of living index of ${city.costIndex}, which is ${city.costIndex > 100 ? `${city.costIndex - 100}% above` : city.costIndex < 100 ? `${100 - city.costIndex}% below` : 'equal to'} the national average. A 1-bedroom apartment costs around ${formatCurrency(city.medianRent1BR)}/month.`
+        }
+      },
+      {
+        '@type': 'Question',
+        name: `What is the state income tax in ${city.state}?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: hasNoStateTax 
+            ? `${city.state} has no state income tax, which can save you thousands of dollars per year compared to states with income tax.`
+            : `${city.state} has a state income tax rate of approximately ${stateTaxPercent}%. This is in addition to federal income tax.`
+        }
+      },
+      {
+        '@type': 'Question',
+        name: `How much is rent in ${city.name}?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: `The median rent for a 1-bedroom apartment in ${city.name} is ${formatCurrency(city.medianRent1BR)}/month. For a 2-bedroom, expect to pay around ${formatCurrency(city.medianRent2BR)}/month. This is ${rentDiff > 0 ? `${rentDiffPercent}% above` : rentDiff < 0 ? `${Math.abs(rentDiffPercent)}% below` : 'equal to'} the national average.`
+        }
+      },
+      {
+        '@type': 'Question',
+        name: `Is ${city.name} a good place to live?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: `${city.name} is a ${popTier.toLowerCase()} with a population of ${city.population.toLocaleString()}. The cost of living is ${costLevel.label.toLowerCase()}, making it ${city.costIndex < 100 ? 'more affordable than average' : city.costIndex > 115 ? 'more expensive than average' : 'about average cost'} for the US. ${hasNoStateTax ? 'A major advantage is zero state income tax.' : ''}`
+        }
+      }
+    ]
+  };
+  
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       <Navbar />
       
       <main className="min-h-screen bg-gray-50">
@@ -456,6 +499,71 @@ export default async function CityPage({ params }: { params: Promise<{ slug: str
             </div>
           </section>
         )}
+        
+        {/* FAQ Section */}
+        <section className="px-4 py-12 bg-white">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-8 flex items-center gap-3">
+              <span className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </span>
+              Frequently Asked Questions
+            </h2>
+            
+            <div className="space-y-4">
+              <details className="bg-gray-50 rounded-xl p-5 group" open>
+                <summary className="font-medium text-gray-900 cursor-pointer list-none flex justify-between items-center">
+                  What is the cost of living in {city.name}, {city.stateCode}?
+                  <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <p className="mt-4 text-gray-600">
+                  {city.name} has a cost of living index of <strong>{city.costIndex}</strong>, which is{' '}
+                  {city.costIndex > 100 ? `${city.costIndex - 100}% above` : city.costIndex < 100 ? `${100 - city.costIndex}% below` : 'equal to'} the national average. 
+                  A 1-bedroom apartment costs around <strong>{formatCurrency(city.medianRent1BR)}/month</strong>.
+                </p>
+              </details>
+              
+              <details className="bg-gray-50 rounded-xl p-5 group">
+                <summary className="font-medium text-gray-900 cursor-pointer list-none flex justify-between items-center">
+                  What is the state income tax in {city.state}?
+                  <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <p className="mt-4 text-gray-600">
+                  {hasNoStateTax 
+                    ? `${city.state} has no state income tax! This can save you thousands of dollars per year compared to states with income tax.`
+                    : `${city.state} has a state income tax rate of approximately ${stateTaxPercent}%. This is in addition to federal income tax.`}
+                </p>
+              </details>
+              
+              <details className="bg-gray-50 rounded-xl p-5 group">
+                <summary className="font-medium text-gray-900 cursor-pointer list-none flex justify-between items-center">
+                  How much is rent in {city.name}?
+                  <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <p className="mt-4 text-gray-600">
+                  The median rent for a 1-bedroom apartment in {city.name} is <strong>{formatCurrency(city.medianRent1BR)}/month</strong>. 
+                  For a 2-bedroom, expect to pay around <strong>{formatCurrency(city.medianRent2BR)}/month</strong>. 
+                  This is {rentDiff > 0 ? `${rentDiffPercent}% above` : rentDiff < 0 ? `${Math.abs(rentDiffPercent)}% below` : 'equal to'} the national average.
+                </p>
+              </details>
+              
+              <details className="bg-gray-50 rounded-xl p-5 group">
+                <summary className="font-medium text-gray-900 cursor-pointer list-none flex justify-between items-center">
+                  Is {city.name} a good place to live?
+                  <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <p className="mt-4 text-gray-600">
+                  {city.name} is a {popTier.toLowerCase()} with a population of {city.population.toLocaleString()}. 
+                  The cost of living is {costLevel.label.toLowerCase()}, making it{' '}
+                  {city.costIndex < 100 ? 'more affordable than average' : city.costIndex > 115 ? 'more expensive than average' : 'about average cost'} for the US.
+                  {hasNoStateTax && ' A major advantage is zero state income tax.'}
+                </p>
+              </details>
+            </div>
+          </div>
+        </section>
         
         {/* Final CTA */}
         <section className="px-4 py-12 sm:py-16 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800">

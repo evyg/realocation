@@ -69,5 +69,25 @@ export default function sitemap(): MetadataRoute.Sitemap {
     };
   });
   
-  return [...staticEntries, ...blogEntries, ...stateEntries, ...cityEntries];
+  // Popular city comparison pages
+  const popularCities = [
+    'new-york-ny', 'los-angeles-ca', 'chicago-il', 'houston-tx', 'phoenix-az',
+    'san-antonio-tx', 'san-diego-ca', 'dallas-tx', 'austin-tx', 'denver-co',
+    'seattle-wa', 'boston-ma', 'nashville-tn', 'portland-or', 'miami-fl',
+    'atlanta-ga', 'san-francisco-ca', 'charlotte-nc', 'raleigh-nc', 'tampa-fl'
+  ];
+  
+  const comparisonEntries: MetadataRoute.Sitemap = [];
+  for (let i = 0; i < popularCities.length; i++) {
+    for (let j = i + 1; j < popularCities.length; j++) {
+      comparisonEntries.push({
+        url: `${baseUrl}/compare/${popularCities[i]}-vs-${popularCities[j]}`,
+        lastModified: new Date(),
+        changeFrequency: 'weekly' as ChangeFrequency,
+        priority: 0.8,
+      });
+    }
+  }
+  
+  return [...staticEntries, ...blogEntries, ...stateEntries, ...cityEntries, ...comparisonEntries];
 }

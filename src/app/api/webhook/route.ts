@@ -62,17 +62,33 @@ export async function POST(request: NextRequest) {
             });
             
             // Create or update user as pro
-            await supabase.from('users').upsert({
+            const { data: userData } = await supabase.from('users').upsert({
               email: customerEmail,
               is_pro: true,
               pro_purchased_at: new Date().toISOString(),
               stripe_customer_id: typeof session.customer === 'string' ? session.customer : null,
             }, {
               onConflict: 'email',
+            }).select('id').single();
+            
+            // Get the purchase ID
+            const { data: purchaseData } = await supabase
+              .from('purchases')
+              .select('id')
+              .eq('stripe_session_id', session.id)
+              .single();
+            
+            // Grant 3 deep dive credits
+            await supabase.from('deep_dive_credits').insert({
+              user_id: userData?.id,
+              email: customerEmail,
+              credits_total: 3,
+              credits_used: 0,
+              purchase_id: purchaseData?.id,
             });
           }
           
-          console.log(`Pro purchase completed for: ${customerEmail}`);
+          console.log(`Pro purchase completed for: ${customerEmail} - 3 credits granted`);
         }
         break;
       }

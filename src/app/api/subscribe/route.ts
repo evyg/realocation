@@ -6,7 +6,19 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, source = 'website' } = body;
+    const { 
+      email, 
+      source = 'website',
+      // Calculator data
+      salary,
+      currentCity,
+      bedrooms,
+      numAdults,
+      numChildren,
+      hasCar,
+      preferences,
+      topCities,
+    } = body;
     
     if (!email || !email.includes('@')) {
       return NextResponse.json(
@@ -15,7 +27,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Option 1: Save to Supabase (when configured)
+    // Save to Supabase
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
     
@@ -23,13 +35,35 @@ export async function POST(request: NextRequest) {
       const { createClient } = await import('@supabase/supabase-js');
       const supabase = createClient(supabaseUrl, supabaseKey);
       
-      const { error } = await supabase
+      // Save email to newsletter_subscribers
+      const { error: subError } = await supabase
         .from('newsletter_subscribers')
         .upsert({ email, source, subscribed_at: new Date().toISOString() });
       
-      if (error) {
-        console.error('Supabase error:', error);
-        // Continue anyway - don't fail the request
+      if (subError) {
+        console.error('Supabase subscriber error:', subError);
+      }
+      
+      // Save calculation data if provided
+      if (salary && currentCity) {
+        const { error: calcError } = await supabase
+          .from('calculations')
+          .insert({
+            salary: parseInt(salary),
+            current_city: currentCity,
+            top_cities: {
+              bedrooms,
+              numAdults,
+              numChildren,
+              hasCar,
+              preferences,
+              results: topCities?.slice(0, 10),
+            },
+          });
+        
+        if (calcError) {
+          console.error('Supabase calculation error:', calcError);
+        }
       }
     }
     

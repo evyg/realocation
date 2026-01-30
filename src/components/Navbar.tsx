@@ -1,12 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const pathname = usePathname();
+  
+  useEffect(() => {
+    setUserEmail(getCookie('realocation_email'));
+  }, []);
   
   const navLinks = [
     { href: '/calculator', label: 'Calculator' },
@@ -67,6 +78,21 @@ export default function Navbar() {
           
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
+            {userEmail ? (
+              <Link
+                href="/dashboard"
+                className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
+              >
+                My Reports
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
+              >
+                Sign In
+              </Link>
+            )}
             <Link
               href="/calculator"
               className="px-5 py-2.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white text-sm font-semibold rounded-xl
@@ -113,6 +139,23 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
+            {userEmail ? (
+              <Link
+                href="/dashboard"
+                onClick={() => setIsMenuOpen(false)}
+                className="block py-2 text-base font-medium text-zinc-600"
+              >
+                My Reports
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setIsMenuOpen(false)}
+                className="block py-2 text-base font-medium text-zinc-600"
+              >
+                Sign In
+              </Link>
+            )}
             <Link
               href="/calculator"
               onClick={() => setIsMenuOpen(false)}
